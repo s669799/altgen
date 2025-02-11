@@ -5,8 +5,11 @@ using LLMAPI.Service;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var configuration = builder.Configuration;
+
 // Add services to the container
 builder.Services.AddControllers(); // Register controllers
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -14,27 +17,29 @@ builder.Services.AddSwaggerGen(c =>
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "API", Version = "v1" });
 });
 
-
 builder.Services.AddHttpClient();
-    //client.DefaultRequestHeaders.Add("Authorization", "Bearer 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");
-
-
 builder.Services.AddScoped<ILLMService, LLMService>();
-
-
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "API v1");
+    });
 }
 
+// Ensure HTTPS Redirection middleware
 app.UseHttpsRedirection();
+
+app.UseAuthorization();
 
 // Map controllers
 app.MapControllers();

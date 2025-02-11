@@ -1,54 +1,77 @@
 using System.Text;
 using System.Text.Json;
 using Google.Cloud.Vision.V1;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.VisualBasic;
+using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace LLMAPI.Service;
 
 public interface ILLMService
 {
-    Task<string> GetDataOpenRouter();
-    string GetDataFromImageGoogle();
+    Task<string> GetDataOpenRouter(string model, string prompt);
+//    string GetDataFromImageGoogle();
 }
 
 
 public class LLMService : ILLMService
 {
     private readonly IHttpClientFactory _httpClientFactory ;
+    private readonly IConfiguration _configuration;
 
-    public LLMService(IHttpClientFactory httpClientFactory)
+    public LLMService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
     {
         _httpClientFactory = httpClientFactory;
+        _configuration = configuration;
     }
 
-    public async Task<string> GetDataOpenRouter()
+    public async Task<string> GetDataOpenRouter(string model, string prompt)
     {
-        var client = _httpClientFactory.CreateClient();
+/*        var client = _httpClientFactory.CreateClient();
 
         client.BaseAddress = new Uri("https://openrouter.ai/api/v1");
         client.DefaultRequestHeaders.Add("Accept", "application/json");
         client.DefaultRequestHeaders.Add("Authorization", "Bearer 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");
+*/
+        var OpenRouterAPIKey = _configuration["OpenRouter:APIKey"];
+        var OpenRouterAPIUrl = _configuration["OpenRouter:APIUrl"];
 
-        var requestBody = new
-        {
-            model = "google/gemini-2.0-flash-thinking-exp:free",
-            messages = new[]
+            var requestData = new
             {
-                new
+                model = model,
+                messages = new List<object>
                 {
-                    role = "user",
-                    content = "Do you know who I am?"
+                    new { role = "user", content = prompt }
+                }
+            };
+
+            string jsonContent = JsonConvert.SerializeObject(requestData);
+
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {OpenRouterAPIKey}");
+
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                HttpResponseMessage response = await client.PostAsync(OpenRouterAPIUrl, content);
+
+                string responseContent = await response.Content.ReadAsStringAsync();
+                if (response.IsSuccessStatusCode)
+                {
+                    dynamic jsonResponse = JsonConvert.DeserializeObject(responseContent);
+                    return jsonResponse?.choices?[0]?.message?.content ?? "No response from AI";
+                }
+                else
+                {
+                    return $"Error: {response.StatusCode}";
                 }
             }
-        };
-
-        var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-
-        var response = await client.PostAsync("https://openrouter.ai/api/v1/chat/completions", jsonContent);
-        response.EnsureSuccessStatusCode(); // Throws an exception if the status code is not successful
-
-        return await response.Content.ReadAsStringAsync();
     }
-    
+/*     
     public string GetDataFromImageGoogle()
     {
 
@@ -70,5 +93,5 @@ public class LLMService : ILLMService
 
         return labels?.ToString();
     }
-    
+ */
 }
