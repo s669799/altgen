@@ -1,74 +1,88 @@
 using System.Text;
-using System.Text.Json;
 using Google.Cloud.Vision.V1;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading.Tasks;
 
-namespace LLMAPI.Service;
-
-public interface ILLMService
+namespace LLMAPI.Service
 {
-    Task<string> GetDataOpenRouter();
-    string GetDataFromImageGoogle();
-}
-
-
-public class LLMService : ILLMService
-{
-    private readonly IHttpClientFactory _httpClientFactory ;
-
-    public LLMService(IHttpClientFactory httpClientFactory)
+    public interface ILLMService
     {
-        _httpClientFactory = httpClientFactory;
+        Task<string> GetDataOpenRouter(string model, string prompt);
+        // string GetDataFromImageGoogle();
     }
 
-    public async Task<string> GetDataOpenRouter()
+    public class LLMService : ILLMService
     {
-        var client = _httpClientFactory.CreateClient();
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _configuration;
 
-        client.BaseAddress = new Uri("https://openrouter.ai/api/v1");
-        client.DefaultRequestHeaders.Add("Accept", "application/json");
-        client.DefaultRequestHeaders.Add("Authorization", "Bearer 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");
-
-        var requestBody = new
+        public LLMService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
-            model = "google/gemini-2.0-flash-thinking-exp:free",
-            messages = new[]
+            _httpClientFactory = httpClientFactory;
+            _configuration = configuration;
+        }
+
+        public async Task<string> GetDataOpenRouter(string model, string prompt)
+        {
+            var OpenRouterAPIKey = _configuration["OpenRouter:APIKey"];
+            var OpenRouterAPIUrl = _configuration["OpenRouter:APIUrl"];
+
+            var requestData = new
             {
-                new
+                model,
+                messages = new List<object>
                 {
-                    role = "user",
-                    content = "Do you know who I am?"
+                    new { role = "user", content = prompt }
                 }
+            };
+
+            string jsonContent = JsonConvert.SerializeObject(requestData);
+
+            var client = _httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {OpenRouterAPIKey}");
+
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+            HttpResponseMessage response = await client.PostAsync(OpenRouterAPIUrl, content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                string responseContent = await response.Content.ReadAsStringAsync();
+                dynamic jsonResponse = JsonConvert.DeserializeObject(responseContent);
+                return jsonResponse?.choices?[0]?.message?.content ?? "No response from AI";
             }
-        };
+            else
+            {
+                return $"Error: {response.StatusCode}";
+            }
+        }
 
-        var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-
-        var response = await client.PostAsync("https://openrouter.ai/api/v1/chat/completions", jsonContent);
-        response.EnsureSuccessStatusCode(); // Throws an exception if the status code is not successful
-
-        return await response.Content.ReadAsStringAsync();
-    }
-    
-    public string GetDataFromImageGoogle()
-    {
-
-
-        Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/single-arcanum-449511-q4-e5c1f9347373.json");
+        // Uncomment and complete the method if needed
         
-        var client = ImageAnnotatorClient.Create();
-        
-        // The path to the image file to annotate
-        var imageFilePath = "testImage/1.jpg";
+        // public string GetDataFromImageGoogle()
+        // {
+        //    Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/single-arcanum-449511-q4-e5c1f9347373.json");
+        //    var client = ImageAnnotatorClient.Create();
 
-        // Load the image file into memory
-        var image = Image.FromFile(imageFilePath);
+        //    // The path to the image file to annotate
+        //    var imageFilePath = "testImage/1.jpg";
 
-        // Perform label detection on the image file
-        IReadOnlyList<EntityAnnotation> labels = client.DetectLabels(image);
+        //    // Load the image file into memory
+        //    var image = Image.FromFile(imageFilePath);
 
-        client.
+        //    // Perform label detection on the image file
+        //    IReadOnlyList<EntityAnnotation> labels = client.DetectLabels(image);
 
-        return labels?.ToString();
+        //    var labelsString = new StringBuilder();
+        //    foreach (var label in labels)
+        //    {
+        //        labelsString.AppendLine($"Description: {label.Description}, Score: {label.Score}");
+        //    }
+
+        //    return labelsString.ToString();
+        // }
     }
-    
 }
