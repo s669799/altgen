@@ -12,7 +12,7 @@ namespace LLMAPI.Service
     public interface ILLMService
     {
         Task<string> GetDataOpenRouter(string model, string prompt);
-        // string GetDataFromImageGoogle();
+        Task<string> GetDataFromImageGoogle(IFormFile imageFile);
     }
 
     public class LLMService : ILLMService
@@ -60,29 +60,45 @@ namespace LLMAPI.Service
             }
         }
 
-        // Uncomment and complete the method if needed
-        
-        // public string GetDataFromImageGoogle()
-        // {
-        //    Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/single-arcanum-449511-q4-e5c1f9347373.json");
-        //    var client = ImageAnnotatorClient.Create();
 
-        //    // The path to the image file to annotate
-        //    var imageFilePath = "testImage/1.jpg";
+        public async Task<string> GetDataFromImageGoogle(IFormFile imageFile)
+        {
 
-        //    // Load the image file into memory
-        //    var image = Image.FromFile(imageFilePath);
+            try
+            {
+                if (imageFile == null || imageFile.Length == 0)
+                {
+                    return "No image uploaded.";
+                }
 
-        //    // Perform label detection on the image file
-        //    IReadOnlyList<EntityAnnotation> labels = client.DetectLabels(image);
+                Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/single-arcanum-449511-q4-e5c1f9347373.json");
 
-        //    var labelsString = new StringBuilder();
-        //    foreach (var label in labels)
-        //    {
-        //        labelsString.AppendLine($"Description: {label.Description}, Score: {label.Score}");
-        //    }
+                using var stream = imageFile.OpenReadStream();
+                var image = Google.Cloud.Vision.V1.Image.FromStream(stream);
 
-        //    return labelsString.ToString();
-        // }
+                var client = ImageAnnotatorClient.Create();
+
+                // Perform label detection on the image file
+                IReadOnlyList<EntityAnnotation> labels = await client.DetectLabelsAsync(image);
+
+                if (labels == null || labels.Count == 0)
+                {
+                    return "No labels detected.";
+                }
+
+                // Format results as alt text
+                var altText = new StringBuilder();
+                foreach (var label in labels)
+                {
+                    altText.AppendLine($"{label.Description} (Confidence: {label.Score:F2})");
+                }
+
+                return altText.ToString();
+            }
+            catch (Exception ex)
+            {
+                return $"Error processing image: {ex.Message}";
+            }
+        }
     }
 }

@@ -20,17 +20,21 @@ namespace LLMAPI.Controllers
         }
 
         /// <summary>
-        /// Example of a disabled endpoint (commented out)
+        /// Upload an image to extract alt text (labels) using Google Vision API.
         /// </summary>
-        /// <returns>Data from Google API</returns>
-        /*
-        [HttpGet(Name = "Test get method")]
-        public async Task<IActionResult> Something()
+        /// <param name="imageFile">Image file uploaded by user</param>
+        /// <returns>Alt text (labels) with confidence scores</returns>
+        [HttpPost("upload-image")]
+        public async Task<IActionResult> UploadImage([FromForm] IFormFile imageFile)
         {
-            var data = _llmService.GetDataFromImageGoogle();
-            return Ok(data);
+            if (imageFile == null || imageFile.Length == 0)
+            {
+                return BadRequest("Please upload a valid image.");
+            }
+
+            var altText = await _llmService.GetDataFromImageGoogle(imageFile);
+            return Ok(new { altText });
         }
-        */
 
         /// <summary>
         /// Simple get method to test the API

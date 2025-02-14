@@ -18,6 +18,7 @@ builder.Services.AddSwaggerGen(c =>
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "API", Version = "v1" });
+    c.OperationFilter<FileUploadOperationFilter>();  // Register the file upload filter
 });
 
 builder.Services.AddHttpClient();
