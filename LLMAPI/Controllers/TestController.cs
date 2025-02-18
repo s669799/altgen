@@ -9,6 +9,9 @@ using LLMAPI.DTO;
 
 namespace LLMAPI.Controllers
 {
+    /// <summary>
+    /// Controller for handling different LLM models.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class TestController : ControllerBase
@@ -23,9 +26,8 @@ namespace LLMAPI.Controllers
         /// <summary>
         /// Upload an image to extract alt text (labels) using Google Vision API.
         /// </summary>
-        /// <param name="imageFile">Image file uploaded by user</param>
-        /// <returns>Alt text (labels) with confidence scores</returns>
-
+        /// <param name="model">The image file uploaded by the user.</param>
+        /// <returns>Returns the extracted alt text (labels) with confidence scores.</returns>
         [HttpPost("upload-image")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadImage([FromForm] FileUploadModel model)
@@ -40,9 +42,9 @@ namespace LLMAPI.Controllers
         }
 
         /// <summary>
-        /// Simple get method to test the API
+        /// Simple GET method to test the API.
         /// </summary>
-        /// <returns>A welcome message</returns>
+        /// <returns>A welcome message.</returns>
         [HttpGet]
         public IActionResult Get()
         {
@@ -50,52 +52,71 @@ namespace LLMAPI.Controllers
         }
 
         /// <summary>
-        /// Endpoint for google/gemini-flash-1.5-8b model
+        /// Endpoint for the google/gemini-flash-1.5-8b model.
         /// </summary>
-        /// <param name="request">Prompt request body</param>
-        /// <returns>Model response</returns>
+        /// <param name="request">The prompt request body containing the prompt text.</param>
+        /// <returns>The response from the model as a string.</returns>
         [HttpPost("google/gemini-flash-1.5-8b")]
         public async Task<IActionResult> Model1Response([FromBody] PromptRequest request)
         {
+            if (string.IsNullOrEmpty(request?.Prompt))
+            {
+                return BadRequest("Prompt cannot be null or empty.");
+            }
+
             string response = await _llmService.GetDataOpenRouter("google/gemini-flash-1.5-8b", request.Prompt);
             return Ok(new { response });
         }
 
         /// <summary>
-        /// Endpoint for openai/gpt-4o-mini model
+        /// Endpoint for the openai/gpt-4o-mini model.
         /// </summary>
-        /// <param name="request">Prompt request body</param>
-        /// <returns>Model response</returns>
+        /// <param name="request">The prompt request body containing the prompt text.</param>
+        /// <returns>The response from the model as a string.</returns>
         [HttpPost("openai/gpt-4o-mini")]
         public async Task<IActionResult> Model2Response([FromBody] PromptRequest request)
         {
+            if (string.IsNullOrEmpty(request?.Prompt))
+            {
+                return BadRequest("Prompt cannot be null or empty.");
+            }
+
             string response = await _llmService.GetDataOpenRouter("openai/gpt-4o-mini", request.Prompt);
             return Ok(new { response });
         }
 
         /// <summary>
-        /// Endpoint for meta-llama/llama-3.3-70b-instruct model
+        /// Endpoint for the meta-llama/llama-3.3-70b-instruct model.
         /// </summary>
-        /// <param name="request">Prompt request body</param>
-        /// <returns>Model response</returns>
+        /// <param name="request">The prompt request body containing the prompt text.</param>
+        /// <returns>The response from the model as a string.</returns>
         [HttpPost("meta-llama/llama-3.3-70b-instruct")]
         public async Task<IActionResult> Model3Response([FromBody] PromptRequest request)
         {
+            if (string.IsNullOrEmpty(request?.Prompt))
+            {
+                return BadRequest("Prompt cannot be null or empty.");
+            }
+
             string response = await _llmService.GetDataOpenRouter("meta-llama/llama-3.3-70b-instruct", request.Prompt);
             return Ok(new { response });
         }
 
         /// <summary>
-        /// Endpoint for deepseek/deepseek-r1 model
+        /// Endpoint for the deepseek/deepseek-r1 model.
         /// </summary>
-        /// <param name="request">Prompt request body</param>
-        /// <returns>Model response</returns>
+        /// <param name="request">The prompt request body containing the prompt text.</param>
+        /// <returns>The response from the model as a string.</returns>
         [HttpPost("deepseek/deepseek-r1")]
         public async Task<IActionResult> Model4Response([FromBody] PromptRequest request)
         {
+            if (string.IsNullOrEmpty(request?.Prompt))
+            {
+                return BadRequest("Prompt cannot be null or empty.");
+            }
+
             string response = await _llmService.GetDataOpenRouter("deepseek/deepseek-r1", request.Prompt);
             return Ok(new { response });
         }  
-      
     }
 }

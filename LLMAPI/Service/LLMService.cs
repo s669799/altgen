@@ -11,11 +11,15 @@ using Google.Api.Gax.Grpc.Rest;
 namespace LLMAPI.Service
 {
     public interface ILLMService
-    {
+    {    
         Task<string> GetDataOpenRouter(string model, string prompt);
+
         Task<string> GetDataFromImageGoogle(IFormFile imageFile);
     }
 
+    /// <summary>
+    /// Service class for handling different LLM models.
+    /// </summary>
     public class LLMService : ILLMService
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -27,6 +31,12 @@ namespace LLMAPI.Service
             _configuration = configuration;
         }
 
+        /// <summary>
+        /// Sends a prompt to a model in the OpenRouter API and retrieves the AI response.
+        /// </summary>
+        /// <param name="model">The model identifier (e.g., "google/gemini-flash-1.5-8b").</param>
+        /// <param name="prompt">The prompt to send to the model.</param>
+        /// <returns>The AI's response as a string.</returns>
         public async Task<string> GetDataOpenRouter(string model, string prompt)
         {
             var OpenRouterAPIKey = _configuration["OpenRouter:APIKey"];
@@ -61,21 +71,24 @@ namespace LLMAPI.Service
             }
         }
 
-
-        public async Task<string> GetDataFromImageGoogle(IFormFile imageFile)
+        /// <summary>
+        /// Analyzes an uploaded image using Google Vision API to detect labels and returns the results.
+        /// </summary>
+        /// <param name="model">The image file to be processed.</param>
+        /// <returns>A string containing detected labels and confidence scores.</returns>
+        public async Task<string> GetDataFromImageGoogle(IFormFile model)
         {
-
-            Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/rich-world-450914-e6-b6ee1b4424e9.json");
 
             try
             {
-                if (imageFile == null || imageFile.Length == 0)
+                if (model == null || model.Length == 0)
                 {
                     return "No image uploaded.";
                 }
 
+                Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/rich-world-450914-e6-b6ee1b4424e9.json");
 
-                using var stream = imageFile.OpenReadStream();
+                using var stream = model.OpenReadStream();
                 var image = Google.Cloud.Vision.V1.Image.FromStream(stream);
 
                 var client = new ImageAnnotatorClientBuilder
