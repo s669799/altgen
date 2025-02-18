@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Google.Api.Gax.Grpc.Rest;
 
 namespace LLMAPI.Service
 {
@@ -64,6 +65,8 @@ namespace LLMAPI.Service
         public async Task<string> GetDataFromImageGoogle(IFormFile imageFile)
         {
 
+            Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/rich-world-450914-e6-b6ee1b4424e9.json");
+
             try
             {
                 if (imageFile == null || imageFile.Length == 0)
@@ -71,12 +74,14 @@ namespace LLMAPI.Service
                     return "No image uploaded.";
                 }
 
-                Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/single-arcanum-449511-q4-e5c1f9347373.json");
 
                 using var stream = imageFile.OpenReadStream();
                 var image = Google.Cloud.Vision.V1.Image.FromStream(stream);
 
-                var client = ImageAnnotatorClient.Create();
+                var client = new ImageAnnotatorClientBuilder
+                {
+                    GrpcAdapter = RestGrpcAdapter.Default
+                }.Build();                
 
                 // Perform label detection on the image file
                 IReadOnlyList<EntityAnnotation> labels = await client.DetectLabelsAsync(image);

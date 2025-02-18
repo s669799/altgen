@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using LLMAPI.DTO;
 
 namespace LLMAPI.Controllers
 {
@@ -24,15 +25,17 @@ namespace LLMAPI.Controllers
         /// </summary>
         /// <param name="imageFile">Image file uploaded by user</param>
         /// <returns>Alt text (labels) with confidence scores</returns>
+
         [HttpPost("upload-image")]
-        public async Task<IActionResult> UploadImage([FromForm] IFormFile imageFile)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadImage([FromForm] FileUploadModel model)
         {
-            if (imageFile == null || imageFile.Length == 0)
+            if (model.File == null || model.File.Length == 0)
             {
                 return BadRequest("Please upload a valid image.");
             }
 
-            var altText = await _llmService.GetDataFromImageGoogle(imageFile);
+            var altText = await _llmService.GetDataFromImageGoogle(model.File);
             return Ok(new { altText });
         }
 
@@ -92,12 +95,7 @@ namespace LLMAPI.Controllers
         {
             string response = await _llmService.GetDataOpenRouter("deepseek/deepseek-r1", request.Prompt);
             return Ok(new { response });
-        }
-
-        // DTO class for prompt request
-        public class PromptRequest
-        {
-            public string? Prompt { get; set; }
-        }
+        }  
+      
     }
 }
