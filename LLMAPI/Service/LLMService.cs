@@ -1,5 +1,7 @@
 using System.Text;
 using Google.Cloud.Vision.V1;
+using Google.Cloud.AIPlatform.V1;
+using Google.Protobuf;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
@@ -7,6 +9,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Google.Api.Gax.Grpc.Rest;
+using Grpc.Core;
 
 namespace LLMAPI.Service
 {
@@ -15,6 +18,8 @@ namespace LLMAPI.Service
         Task<string> GetDataOpenRouter(string model, string prompt);
 
         Task<string> GetDataFromImageGoogle(IFormFile imageFile);
+
+        Task<string> GenerateContent(string projectId, string location, string publisher, string model);
     }
 
     /// <summary>
@@ -120,10 +125,10 @@ namespace LLMAPI.Service
         }
 
         public async Task<string> GenerateContent(
-            string projectId = "rich-world-450914-e6",
-            string location = "europe-west4",
-            string publisher = "google",
-            string model = "gemini-1.5-flash-001"
+            string projectId,
+            string location,
+            string publisher,
+            string model
             )
         {
             // Create client
@@ -163,7 +168,7 @@ namespace LLMAPI.Service
             StringBuilder fullText = new();
 
             // Read streaming responses from server until complete
-            AsyncResponseStream<GenerateContentResponse> responseStream = response.GetResponseStream();
+            var responseStream = response.GetResponseStream();
             await foreach (GenerateContentResponse responseItem in responseStream)
             {
                 fullText.Append(responseItem.Candidates[0].Content.Parts[0].Text);

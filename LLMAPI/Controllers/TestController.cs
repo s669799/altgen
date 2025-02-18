@@ -42,6 +42,29 @@ namespace LLMAPI.Controllers
         }
 
         /// <summary>
+        /// Processes an image using Gemini AI and returns a textual description.
+        /// </summary>
+        /// <param name="model">The image to analyze.</param>
+        /// <returns>AI-generated description of the image.</returns>
+        [HttpPost("analyze-image")]
+        public async Task<IActionResult> AnalyzeImage([FromForm] FileUploadModel model)
+        {
+            if (model.File == null || model.File.Length == 0)
+            {
+                return BadRequest("No image uploaded.");
+            }
+
+            string response = await _llmService.GenerateContent(
+                "rich-world-450914-e6", 
+                "europe-west4", 
+                "google", 
+                "gemini-1.5-flash-001"
+            );
+            return Ok(response);
+        }
+    
+
+        /// <summary>
         /// Simple GET method to test the API.
         /// </summary>
         /// <returns>A welcome message.</returns>
