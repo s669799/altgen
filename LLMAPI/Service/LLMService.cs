@@ -10,6 +10,12 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Google.Api.Gax.Grpc.Rest;
 using Grpc.Core;
+using Google.Apis.Auth.OAuth2;
+using System.IO;
+using System.Threading.Tasks;
+using System.Text.Json;
+using Google.Api.Gax.Grpc;
+
 
 namespace LLMAPI.Service
 {
@@ -124,58 +130,69 @@ namespace LLMAPI.Service
             }
         }
 
-        public async Task<string> GenerateContent(
-            string projectId,
-            string location,
-            string publisher,
-            string model
-            )
+        public async Task<string> GenerateContent(string projectId, string location, string publisher, string model)
         {
-            // Create client
             var predictionServiceClient = new PredictionServiceClientBuilder
             {
                 Endpoint = $"{location}-aiplatform.googleapis.com"
             }.Build();
 
-            // Initialize content request
+            ByteString colosseum = await ReadImageFileAsync(
+                "https://storage.googleapis.com/cloud-samples-data/vertex-ai/llm/prompts/landmark1.png");
+
+            ByteString forbiddenCity = await ReadImageFileAsync(
+                "https://storage.googleapis.com/cloud-samples-data/vertex-ai/llm/prompts/landmark2.png");
+
+            ByteString christRedeemer = await ReadImageFileAsync(
+                "https://storage.googleapis.com/cloud-samples-data/vertex-ai/llm/prompts/landmark3.png");
+
+            ByteString camera = await ReadImageFileAsync(
+                "https://storage.cloud.google.com/altgen_dam_bucket/camera.png");
+
             var generateContentRequest = new GenerateContentRequest
             {
                 Model = $"projects/{projectId}/locations/{location}/publishers/{publisher}/models/{model}",
-                GenerationConfig = new GenerationConfig
-                {
-                    Temperature = 0.4f,
-                    TopP = 1,
-                    TopK = 32,
-                    MaxOutputTokens = 2048
-                },
                 Contents =
                 {
                     new Content
-                    {   
+                    {
                         Role = "USER",
                         Parts =
                         {
+/*                             new Part { InlineData = new() { MimeType = "image/png", Data = colosseum }},
+                            new Part { Text = "city: Rome, Landmark: the Colosseum" },
+                            new Part { InlineData = new() { MimeType = "image/png", Data = forbiddenCity }},
+                            new Part { Text = "city: Beijing, Landmark: Forbidden City"},
+                            new Part { InlineData = new() { MimeType = "image/png", Data = christRedeemer }} */
+                            
                             new Part { Text = "What's in this photo?" },
-                            new Part { FileData = new() { MimeType = "image/png", FileUri = "gs://generativeai-downloads/images/scones.jpg" } }
+                            new Part { InlineData = new() { MimeType = "image/png", Data = camera} },
+                            new Part { Text = "What's in this photo?" },
+                            new Part { InlineData = new() { MimeType = "image/png", Data = forbiddenCity} }
+                    
                         }
-                    }   
+                    }
                 }
             };
 
-            // Make the request, returning a streaming response
             using PredictionServiceClient.StreamGenerateContentStream response = predictionServiceClient.StreamGenerateContent(generateContentRequest);
 
             StringBuilder fullText = new();
 
-            // Read streaming responses from server until complete
-            var responseStream = response.GetResponseStream();
+            AsyncResponseStream<GenerateContentResponse> responseStream = response.GetResponseStream();
             await foreach (GenerateContentResponse responseItem in responseStream)
             {
                 fullText.Append(responseItem.Candidates[0].Content.Parts[0].Text);
             }
-
             return fullText.ToString();
         }
-    }
 
+        private static async Task<ByteString> ReadImageFileAsync(string url)
+        {
+            using HttpClient client = new();
+            using var response = await client.GetAsync(url);
+            byte[] imageBytes = await response.Content.ReadAsByteArrayAsync();
+            return ByteString.CopyFrom(imageBytes);
+        }
+    }
 }
