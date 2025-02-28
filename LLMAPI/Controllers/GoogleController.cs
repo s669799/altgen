@@ -1,0 +1,74 @@
+using LLMAPI.Services.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+using LLMAPI.DTO;
+
+
+namespace LLMAPI.Controllers
+{
+    [ApiController]
+    [Route("api/google")]
+    public class GoogleController : ControllerBase
+    {
+        private readonly IImageRecognitionService _imageRecognitionService;
+        private readonly ITextGenerationService _textService;
+
+        public GoogleController(
+            IImageRecognitionService GoogleImageRecognitionService, 
+            ITextGenerationService GoogleTextGenerationService)
+        {
+            _imageRecognitionService = GoogleImageRecognitionService;
+            _textService = GoogleTextGenerationService;
+        }
+
+        /// <summary>
+        /// Analyzes an uploaded image using Google Vision API and generates a content description.
+        /// </summary>
+        /// <param name="imageFile">The image file to process.</param>
+        /// <returns>AI-generated content description or error message.</returns>
+        [HttpPost("analyze-image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> AnalyzeImage(string imageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(imageUrl))
+            {
+            return BadRequest("Please provide a valid image URL.");
+            }
+
+            try
+            {   
+                // Parameters for the API call
+                string projectId = "rich-world-450914-e6";
+                string location = "europe-west4";
+                string publisher = "google";
+                string model = "gemini-2.0-flash-001";
+
+                // Convert the uploaded image file to a ByteString
+                var imageBytes = await _imageRecognitionService.ReadImageFileAsync(imageUrl);
+
+                // Call the GenerateContent method with necessary parameters
+                var content = await _imageRecognitionService.GenerateContent(projectId, location, publisher, model, imageBytes);
+
+                return Ok(new { ImageContent = content });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        // Text generation endpoint using DeepSeek model (delegates to OpenRouterService)
+        [HttpPost("generate-text")]
+        public async Task<IActionResult> GenerateText(PromptRequest request)
+        {
+            if (string.IsNullOrEmpty(request?.Prompt))
+            {
+                return BadRequest("Prompt cannot be null or empty.");
+            }
+
+            var response = await _textService.GenerateText(request.Prompt);
+            return Ok(new { response });
+        }
+
+    }
+}

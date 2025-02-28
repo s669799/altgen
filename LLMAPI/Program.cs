@@ -1,14 +1,19 @@
 using System.Reflection;
-using Microsoft.AspNetCore.OpenApi;
 using LLMAPI.Controllers;
-using LLMAPI.Service;
+using LLMAPI.DTO;
+using LLMAPI.Services.Interfaces;
+using LLMAPI.Services.Google;
+using LLMAPI.Services.OpenAI; 
+using LLMAPI.Services.Llama;
+using LLMAPI.Services.OpenRouter;
+using LLMAPI.Services.DeepSeek;
+using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var configuration = builder.Configuration;
 
-// Add services to the container
-builder.Services.AddControllers(); // Register controllers
+builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -22,7 +27,22 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<ILLMService, LLMService>();
+
+// Add OpenRouterService (the core service for handling requests to the OpenRouter API)
+builder.Services.AddScoped<OpenRouterService>();
+
+// Google Services
+builder.Services.AddScoped<IImageRecognitionService, GoogleImageRecognitionService>();
+builder.Services.AddScoped<ITextGenerationService, GoogleTextGenerationService>();
+
+// OpenAI Services
+builder.Services.AddScoped<ITextGenerationService, OpenAITextGenerationService>();
+
+// Meta Services
+builder.Services.AddScoped<ITextGenerationService, LlamaTextGenerationService>();
+
+// Add DeepSeek service (if applicable)
+builder.Services.AddScoped<ITextGenerationService, DeepSeekTextGenerationService>();
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 builder.Services.AddCors(options =>

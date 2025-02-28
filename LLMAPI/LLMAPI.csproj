@@ -12,8 +12,9 @@
         <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
         <PackageReference Include="Google.Apis.Drive.v3" Version="1.69.0.3699" />
         <PackageReference Include="Google.Apis.Oauth2.v2" Version="1.68.0.1869" />
-        <PackageReference Include="Google.Cloud.AIPlatform.V1" Version="3.18.0" />
+        <PackageReference Include="Google.Cloud.AIPlatform.V1" Version="3.19.0" />
         <PackageReference Include="Google.Cloud.Vision.V1" Version="3.7.0" />
+        <PackageReference Include="Grpc.Core" Version="2.46.6" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.1" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
     </ItemGroup>
