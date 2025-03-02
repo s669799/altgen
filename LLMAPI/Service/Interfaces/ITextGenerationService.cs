@@ -4,6 +4,6 @@ namespace LLMAPI.Services.Interfaces
 {
     public interface ITextGenerationService
     {
-        Task<string> GenerateText(string prompt);
+        Task<string> GenerateText(string model, string prompt);
     }
 }

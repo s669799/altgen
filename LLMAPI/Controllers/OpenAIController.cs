@@ -40,7 +40,7 @@ namespace LLMAPI.Controllers
                 return BadRequest("Prompt cannot be null or empty.");
             }
 
-            var response = await _textService.GenerateText(request.Prompt);
+            var response = await _textService.GenerateText("openai/gpt-4o-mini", request.Prompt);
             return Ok(new { response });
         }
     }

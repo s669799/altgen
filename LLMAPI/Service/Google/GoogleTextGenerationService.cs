@@ -15,10 +15,10 @@ namespace LLMAPI.Services.Google
             _openRouterService = openRouterService;
         }
 
-        public async Task<string> GenerateText(string prompt)
+        public async Task<string> GenerateText(string model, string prompt)
         {
             // Call OpenRouterService to generate text using the Google model
-            return await _openRouterService.GenerateText(prompt);
+            return await _openRouterService.GenerateText(model, prompt);
         }
     }
 }

@@ -57,7 +57,7 @@ namespace LLMAPI.Controllers
             }
         }
 
-        // Text generation endpoint using DeepSeek model (delegates to OpenRouterService)
+        // Text generation endpoint using Gemeni model (delegates to OpenRouterService)
         [HttpPost("generate-text")]
         public async Task<IActionResult> GenerateText(PromptRequest request)
         {
@@ -66,7 +66,7 @@ namespace LLMAPI.Controllers
                 return BadRequest("Prompt cannot be null or empty.");
             }
 
-            var response = await _textService.GenerateText(request.Prompt);
+            var response = await _textService.GenerateText("google/gemini-flash-1.5-8b", request.Prompt);
             return Ok(new { response });
         }
 

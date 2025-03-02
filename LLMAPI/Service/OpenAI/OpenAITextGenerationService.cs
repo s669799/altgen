@@ -21,10 +21,10 @@ namespace LLMAPI.Services.OpenAI
         /// </summary>
         /// <param name="prompt">The prompt to send to the OpenAI model.</param>
         /// <returns>The AI's response as a string.</returns>
-        public async Task<string> GenerateText(string prompt)
+        public async Task<string> GenerateText(string model, string prompt)
         {
             // Call the OpenRouterService's GenerateText method with the OpenAI model identifier
-            return await _openRouterService.GenerateText(prompt);
+            return await _openRouterService.GenerateText(model, prompt);
         }
     }
 }

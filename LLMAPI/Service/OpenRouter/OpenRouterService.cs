@@ -19,17 +19,14 @@ namespace LLMAPI.Services.OpenRouter
             _configuration = configuration;
         }
 
-        public async Task<string> GenerateText(string prompt)
+        public async Task<string> GenerateText(string model, string prompt)
         {
             var openRouterAPIKey = _configuration["OpenRouter:APIKey"];
             var openRouterAPIUrl = _configuration["OpenRouter:APIUrl"];
             
-            // Hardcode the model here
-            var model = "default-model";  // Replace with your desired default model
-
             var requestData = new
             {
-                model,  // Use the model variable here
+                model,
                 messages = new List<object>
                 {
                     new { role = "user", content = prompt }

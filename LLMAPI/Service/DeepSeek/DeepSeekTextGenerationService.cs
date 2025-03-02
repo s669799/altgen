@@ -14,10 +14,10 @@ namespace LLMAPI.Services.DeepSeek
             _openRouterService = openRouterService;
         }
 
-        public async Task<string> GenerateText(string prompt)
+        public async Task<string> GenerateText(string model, string prompt)
         {
             // Call OpenRouterService to generate text using the DeepSeek model
-            return await _openRouterService.GenerateText(prompt);
+            return await _openRouterService.GenerateText(model, prompt);
         }
     }
 }
