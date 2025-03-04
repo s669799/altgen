@@ -22,6 +22,16 @@ namespace LLMAPI.Services.Google
             _configuration = configuration;
         }
 
+        public async Task<string> AnalyzeImage(string model, string imgUrl)
+        {
+            return null;
+        }
+        
+        public async Task<string> AnalyzeImageBase64(string model, string imgUrl)
+        {
+            return null;
+        }
+
         public async Task<string> AnalyzeImage(IFormFile imageFile)
         {
             Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/rich-world-450914-e6-b6ee1b4424e9.json");
@@ -69,7 +79,7 @@ namespace LLMAPI.Services.Google
                         Role = "USER",
                         Parts =
                         {
-                            new Part { Text = "What's in this image?" },
+                            new Part { Text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
                             new Part { InlineData = new() { MimeType = "image/png", Data = imageBytes } }
                         }
                     }

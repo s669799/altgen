@@ -31,17 +31,14 @@ builder.Services.AddHttpClient();
 // Add OpenRouterService (the core service for handling requests to the OpenRouter API)
 builder.Services.AddScoped<OpenRouterService>();
 
-// Google Services
+// Register IImageRecognitionService separately with the correct implementation
+builder.Services.AddScoped<IImageRecognitionService, OpenRouterService>();  // Ensure OpenRouterService is registered first
 builder.Services.AddScoped<IImageRecognitionService, GoogleImageRecognitionService>();
-builder.Services.AddScoped<ITextGenerationService, GoogleTextGenerationService>();
 
-// OpenAI Services
+// Register ITextGenerationService with its respective implementations
 builder.Services.AddScoped<ITextGenerationService, OpenAITextGenerationService>();
-
-// Meta Services
+builder.Services.AddScoped<ITextGenerationService, GoogleTextGenerationService>();
 builder.Services.AddScoped<ITextGenerationService, LlamaTextGenerationService>();
-
-// Add DeepSeek service (if applicable)
 builder.Services.AddScoped<ITextGenerationService, DeepSeekTextGenerationService>();
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
