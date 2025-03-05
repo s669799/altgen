@@ -6,6 +6,8 @@ namespace LLMAPI.Services.Interfaces
 {
     public interface IImageRecognitionService
     {
+        Task<string> AnalyzeImage(string model, ByteString imageBytes);
+
         Task<string> AnalyzeImage(string model, string imageUrl);
 
         Task<string> AnalyzeImageBase64(string model, string imageUrl);
@@ -13,5 +15,7 @@ namespace LLMAPI.Services.Interfaces
         Task<string> GenerateContent(string projectId, string location, string publisher, string model, ByteString imageBytes);
 
         Task<ByteString> ReadImageFileAsync(string url);
+        
+        Task<ByteString> ConvertImageToByteString(IFormFile imageFile);
     }
 }

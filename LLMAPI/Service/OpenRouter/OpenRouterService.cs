@@ -1,163 +1,191 @@
-using System.IO;
-using System.Threading.Tasks;
-using Google.Protobuf;
-using Microsoft.AspNetCore.Http;
-using Newtonsoft.Json;
-using System.Net.Http;
-using System.Text;
-using System.Collections.Generic;
-using Microsoft.Extensions.Configuration;
-using LLMAPI.Services.Interfaces;
+    using System.IO;
+    using System.Threading.Tasks;
+    using Google.Protobuf;
+    using Microsoft.AspNetCore.Http;
+    using Newtonsoft.Json;
+    using System.Net.Http;
+    using System.Text;
+    using System.Collections.Generic;
+    using Microsoft.Extensions.Configuration;
+    using LLMAPI.Services.Interfaces;
 
-namespace LLMAPI.Services.OpenRouter
-{
-    public class OpenRouterService : ITextGenerationService, IImageRecognitionService
+    namespace LLMAPI.Services.OpenRouter
     {
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IConfiguration _configuration;
-
-        public OpenRouterService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        public class OpenRouterService : ITextGenerationService, IImageRecognitionService
         {
-            _httpClientFactory = httpClientFactory;
-            _configuration = configuration;
-        }
+            private readonly IHttpClientFactory _httpClientFactory;
+            private readonly IConfiguration _configuration;
 
-        public async Task<string> GenerateText(string model, string prompt)
-        {
-            var requestData = new
+            public OpenRouterService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
             {
-                model,
-                messages = new List<object>
-                {
-                    new { role = "user", content = prompt }
-                }
-            };
+                _httpClientFactory = httpClientFactory;
+                _configuration = configuration;
+            }
 
-            return await SendRequest(requestData);
-        }
 
-        public async Task<string> AnalyzeImage(string model, string imageUrl)
-        {
-            var requestData = new
+            public async Task<string> GenerateText(string model, string prompt)
             {
-                model,
-                messages = new List<object>
+                var requestData = new
                 {
-                    new
+                    model,
+                    messages = new List<object>
                     {
-                        role = "user",
-                        content = new List<object>
+                        new { role = "user", content = prompt }
+                    }
+                };
+
+                return await SendRequest(requestData);
+            }
+
+
+            public async Task<string> AnalyzeImage(string model, string imageUrl)
+            {
+                var requestData = new
+                {
+                    model,
+                    messages = new List<object>
+                    {
+                        new
                         {
-                            new { type = "text", text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
-                            new { type = "image_url", image_url = new { url = imageUrl } }
+                            role = "user",
+                            content = new List<object>
+                            {
+                                new { type = "text", text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
+                                new { type = "image_url", image_url = imageUrl }
+                            }
                         }
                     }
-                }
-            };
+                };
 
-            return await SendRequest(requestData);
-        }
+                return await SendRequest(requestData);
+            }
 
+
+            public async Task<string> AnalyzeImage(string model, ByteString imageBytes)
+            {
+                string base64Image = imageBytes.ToBase64();
+                string dataUri = $"data:image/png;base64,{base64Image}";
+                
+                var requestData = new {
+                    model,
+                    response_format = new { type = "json_object" },
+                    messages = new List<object> {
+                        new {
+                            role = "user",
+                            content = new List<object> {
+                                new { type = "text", text = "Write a brief, one to two sentence alt text description for this image." },
+                                new { type = "image_bytes", image_bytes = dataUri }
+                            }  
+                        }
+                    }
+                };
         
-        /// <summary>
-        /// New method that fetches the image from the URL, converts it to a base64-encoded string (with a data URI prefix),
-        /// and sends it using the "image_bytes" field.
-        /// </summary>
-        public async Task<string> AnalyzeImageBase64(string model, string imageUrl)
-        {
-            // Retrieve image bytes from the URL
-            ByteString imageBytes = await ReadImageFileAsync(imageUrl);
-            // Convert the ByteString to a base64 string
-            string base64Image = Convert.ToBase64String(imageBytes.ToByteArray());
-            // You might need to adjust the MIME type based on your image (e.g., "image/png" if it's a PNG)
-            string dataUri = $"data:image/jpeg;base64,{base64Image}";
+                return await SendRequest(requestData);
+            }
 
-            var requestData = new
+
+            /// <summary>
+            /// New method that fetches the image from the URL, converts it to a base64-encoded string (with a data URI prefix),
+            /// and sends it using the "image_bytes" field.
+            /// </summary>
+            public async Task<string> AnalyzeImageBase64(string model, string imageUrl)
             {
-                model,
-                messages = new List<object>
+                ByteString imageBytes = await ReadImageFileAsync(imageUrl);
+                string base64Image = Convert.ToBase64String(imageBytes.ToByteArray());
+                string dataUri = $"data:image/png;base64,{base64Image}";
+
+                var requestData = new
                 {
-                    new
+                    model,
+                    messages = new List<object>
                     {
-                        role = "user",
-                        content = new List<object>
+                        new
                         {
-                            new { type = "text", text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
-                            new { type = "image_bytes", image_bytes = dataUri }
+                            role = "user",
+                            content = new List<object>
+                            {
+                                new { type = "text", text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
+                                new { type = "image_bytes", image_bytes = dataUri }
+                            }
                         }
                     }
-                }
-            };
+                };
 
-            return await SendRequest(requestData);
-        }
+                return await SendRequest(requestData);
+            }
 
-/*         public async Task<string> AnalyzeImage(string model, ByteString imageBytes)
-        {
-            var requestData = new
+            private async Task<string> SendRequest(object requestData)
             {
-                model,
-                messages = new List<object>
-                {
-                    new
-                    {
-                        role = "user",
-                        content = new List<object>
-                        {
-                            new { type = "text", text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
-                            new { type = "image_bytes", image_bytes = imageBytes.ToBase64() } // Convert ByteString to Base64 for API request
-                        }
-                    }
-                }
-            };
+                var openRouterAPIKey = _configuration["OpenRouter:APIKey"];
+                var openRouterAPIUrl = _configuration["OpenRouter:APIUrl"];
 
-            return await SendRequest(requestData);
-        } */
+                var client = _httpClientFactory.CreateClient();
 
-        private async Task<string> SendRequest(object requestData)
-        {
-            var openRouterAPIKey = _configuration["OpenRouter:APIKey"];
-            var openRouterAPIUrl = _configuration["OpenRouter:APIUrl"];
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {openRouterAPIKey}");
+                client.DefaultRequestHeaders.Add("HTTP-Referer", "https://localhost:5256");
+                client.DefaultRequestHeaders.Add("X-Title", "AltGen");
 
-            var client = _httpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {openRouterAPIKey}");
+                var jsonContent = JsonConvert.SerializeObject(requestData);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            var jsonContent = JsonConvert.SerializeObject(requestData);
-            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await client.PostAsync(openRouterAPIUrl, content);
 
-            var response = await client.PostAsync(openRouterAPIUrl, content);
+                Console.WriteLine("Status code: " + response.StatusCode);
+                Console.WriteLine("Response headers: " + response.Headers);
 
-            if (response.IsSuccessStatusCode)
-            {
                 var responseContent = await response.Content.ReadAsStringAsync();
-                dynamic jsonResponse = JsonConvert.DeserializeObject(responseContent);
-                return jsonResponse?.choices?[0]?.message?.content ?? "No response from AI";
+                Console.WriteLine("Raw API response: " + responseContent);
+
+                // Check if response is successful
+                if (response.IsSuccessStatusCode)
+                {
+                    dynamic jsonResponse = JsonConvert.DeserializeObject(responseContent);
+
+                    // Check if error exists in the response
+                    if (jsonResponse?.error != null)
+                    {
+                        Console.WriteLine("Error details: " + jsonResponse.error);
+                        return $"Error: {jsonResponse.error}";
+                    }
+
+                    // Check if there's a valid response with text content (image description)
+                    var imageDescription = jsonResponse?.choices?[0]?.message?.content;
+                    if (imageDescription != null)
+                    {
+                        // Return the description text
+                        return imageDescription.ToString();
+                    }
+
+                    // If no valid content, return a default message
+                    return "No valid content returned from the model.";
+                }
+                else
+                {
+                    // If response is not successful, log the error and return
+                    Console.WriteLine($"Error: {response.StatusCode}. Response: {responseContent}");
+                    return $"Error: {response.StatusCode}. Response: {responseContent}";
+                }
             }
-            else
+
+
+            public async Task<string> GenerateContent(string projectId, string location, string publisher, string model, ByteString imageBytes)
             {
-                return $"Error: {response.StatusCode}";
+                return null;
             }
-        }
-        
 
-        public async Task<string> GenerateContent(string projectId, string location, string publisher, string model, ByteString imageBytes)
-        {
-            return null;
-        }
+            public async Task<ByteString> ConvertImageToByteString(IFormFile imageFile)
+            {
+                using var memoryStream = new MemoryStream();
+                await imageFile.CopyToAsync(memoryStream);
+                return ByteString.CopyFrom(memoryStream.ToArray());
+            }
 
-        public async Task<ByteString> ConvertImageToByteString(IFormFile imageFile)
-        {
-            using var memoryStream = new MemoryStream();
-            await imageFile.CopyToAsync(memoryStream);
-            return ByteString.CopyFrom(memoryStream.ToArray());
-        }
-
-        public async Task<ByteString> ReadImageFileAsync(string url)
-        {
-            using HttpClient client = new();
-            using var response = await client.GetAsync(url);
-            byte[] imageBytes = await response.Content.ReadAsByteArrayAsync();
-            return ByteString.CopyFrom(imageBytes);
+            public async Task<ByteString> ReadImageFileAsync(string url)
+            {
+                using HttpClient client = new();
+                using var response = await client.GetAsync(url);
+                byte[] imageBytes = await response.Content.ReadAsByteArrayAsync();
+                return ByteString.CopyFrom(imageBytes);
+            }
         }
     }
-}

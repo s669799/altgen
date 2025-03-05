@@ -32,6 +32,12 @@ namespace LLMAPI.Services.Google
             return null;
         }
 
+        public async Task<string> AnalyzeImage(string model, ByteString imageBytes)
+        {
+            return null;
+        }
+
+
         public async Task<string> AnalyzeImage(IFormFile imageFile)
         {
             Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/rich-world-450914-e6-b6ee1b4424e9.json");
@@ -98,6 +104,13 @@ namespace LLMAPI.Services.Google
             }
 
             return fullText.ToString();
+        }
+        
+        public async Task<ByteString> ConvertImageToByteString(IFormFile imageFile)
+        {
+            using var memoryStream = new MemoryStream();
+            await imageFile.CopyToAsync(memoryStream);
+            return ByteString.CopyFrom(memoryStream.ToArray());
         }
 
         public async Task<ByteString> ReadImageFileAsync(string url)

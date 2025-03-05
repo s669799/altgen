@@ -28,12 +28,18 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddHttpClient();
 
-// Add OpenRouterService (the core service for handling requests to the OpenRouter API)
+// Register the concrete OpenRouterService.
 builder.Services.AddScoped<OpenRouterService>();
+
+// Resolve both interfaces from the same instance.
+builder.Services.AddScoped<IImageRecognitionService>(sp => sp.GetRequiredService<OpenRouterService>());
+builder.Services.AddScoped<ITextGenerationService>(sp => sp.GetRequiredService<OpenRouterService>());
 
 // Register IImageRecognitionService separately with the correct implementation
 builder.Services.AddScoped<IImageRecognitionService, OpenRouterService>();  // Ensure OpenRouterService is registered first
 builder.Services.AddScoped<IImageRecognitionService, GoogleImageRecognitionService>();
+
+
 
 // Register ITextGenerationService with its respective implementations
 builder.Services.AddScoped<ITextGenerationService, OpenAITextGenerationService>();

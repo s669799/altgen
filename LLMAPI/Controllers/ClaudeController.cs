@@ -11,24 +11,28 @@ namespace LLMAPI.Controllers
     public class ClaudeController : ControllerBase
     {
         private readonly IImageRecognitionService _imageRecognitionService;
+        private readonly ITextGenerationService _textService;
 
-        public ClaudeController(IImageRecognitionService OpenRouterService)
+        public ClaudeController(
+            IImageRecognitionService imageRecognitionService, 
+            ITextGenerationService textService)
         {
-            _imageRecognitionService = OpenRouterService;
+            _imageRecognitionService = imageRecognitionService;
+            _textService = textService;
         }
 
         /// <summary>
         /// Processes an image from a URL using Claude and generates an alt text description.
         /// </summary>
         [HttpPost("analyze-image-url")]
-        public async Task<IActionResult> AnalyzeImageUrl(string imageUrl)
+        public async Task<IActionResult> AnalyzeImageUrl([FromBody] ImageRequest request)
         {
-            if (string.IsNullOrWhiteSpace(imageUrl))
-                return BadRequest("Please provide a valid image URL.");
+            if (string.IsNullOrWhiteSpace(request?.ImageUrl))
+            return BadRequest("Please provide a valid image URL.");
 
             try
             {
-                var content = await _imageRecognitionService.AnalyzeImage("google/gemini-2.0-flash-lite-preview-02-05:free", imageUrl);
+                var content = await _imageRecognitionService.AnalyzeImage("anthropic/claude-3.5-sonnet", request.ImageUrl);
                 return Ok(new { ImageContent = content });
             }
             catch (Exception ex)
@@ -37,7 +41,8 @@ namespace LLMAPI.Controllers
             }
         }
 
-/*         /// <summary>
+
+        /// <summary>
         /// Processes an uploaded image file using Claude and generates an alt text description.
         /// </summary>
         [HttpPost("analyze-image-file")]
@@ -57,6 +62,20 @@ namespace LLMAPI.Controllers
             {
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
-        } */
+        }
+
+        
+        // Text generation endpoint using Gemeni model (delegates to OpenRouterService)
+        [HttpPost("generate-text")]
+        public async Task<IActionResult> GenerateText(PromptRequest request)
+        {
+            if (string.IsNullOrEmpty(request?.Prompt))
+            {
+                return BadRequest("Prompt cannot be null or empty.");
+            }
+
+            var response = await _textService.GenerateText("anthropic/claude-3.7-sonnet", request.Prompt);
+            return Ok(new { response });
+        }
     }
 }
