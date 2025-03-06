@@ -1,4 +1,4 @@
-@LLMAPI_HostAddress = http://localhost:5256
+@LLMAPI_HostAddress = https://localhost:5256
 
 GET {{LLMAPI_HostAddress}}/weatherforecast/
 Accept: application/json

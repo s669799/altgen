@@ -51,7 +51,7 @@
                             content = new List<object>
                             {
                                 new { type = "text", text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
-                                new { type = "image_url", image_url = imageUrl }
+                                new { type = "image_url", image_url = new { url = imageUrl } }
                             }
                         }
                     }
