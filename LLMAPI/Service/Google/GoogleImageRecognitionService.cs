@@ -10,10 +10,11 @@ using System.Threading.Tasks;
 using Google.Api.Gax.Grpc.Rest;
 using Google.Api.Gax.Grpc;
 using LLMAPI.Services.Interfaces;
+using LLMAPI.Service.Interfaces;
 
 namespace LLMAPI.Services.Google
 {
-    public class GoogleImageRecognitionService : IImageRecognitionService
+    public class GoogleImageRecognitionService : IGoogleService, IImageFileService
     {
         private readonly IConfiguration _configuration;
 
@@ -22,23 +23,7 @@ namespace LLMAPI.Services.Google
             _configuration = configuration;
         }
 
-        public async Task<string> AnalyzeImage(string model, string imgUrl)
-        {
-            return null;
-        }
-        
-        public async Task<string> AnalyzeImageBase64(string model, string imgUrl)
-        {
-            return null;
-        }
-
-        public async Task<string> AnalyzeImage(string model, ByteString imageBytes)
-        {
-            return null;
-        }
-
-
-        public async Task<string> AnalyzeImage(IFormFile imageFile)
+        public async Task<string> AnalyzeImageGoogleVision(IFormFile imageFile)
         {
             Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/rich-world-450914-e6-b6ee1b4424e9.json");
 

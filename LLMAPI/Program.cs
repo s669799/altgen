@@ -8,6 +8,7 @@ using LLMAPI.Services.Llama;
 using LLMAPI.Services.OpenRouter;
 using LLMAPI.Services.DeepSeek;
 using Microsoft.Extensions.Configuration;
+using LLMAPI.Service.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,24 +29,18 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddHttpClient();
 
-// Register the concrete OpenRouterService.
+// Register the concrete OpenRouterService
 builder.Services.AddScoped<OpenRouterService>();
 
-// Resolve both interfaces from the same instance.
+// For image recognition, use the concrete OpenRouterService
 builder.Services.AddScoped<IImageRecognitionService>(sp => sp.GetRequiredService<OpenRouterService>());
+
+// For file conversion, use the same concrete OpenRouterService
+builder.Services.AddScoped<IImageFileService>(sp => sp.GetRequiredService<OpenRouterService>());
+
+// For text generation, also use the concrete OpenRouterService (if that's what you want)
 builder.Services.AddScoped<ITextGenerationService>(sp => sp.GetRequiredService<OpenRouterService>());
 
-// Register IImageRecognitionService separately with the correct implementation
-builder.Services.AddScoped<IImageRecognitionService, OpenRouterService>();  // Ensure OpenRouterService is registered first
-builder.Services.AddScoped<IImageRecognitionService, GoogleImageRecognitionService>();
-
-
-
-// Register ITextGenerationService with its respective implementations
-builder.Services.AddScoped<ITextGenerationService, OpenAITextGenerationService>();
-builder.Services.AddScoped<ITextGenerationService, GoogleTextGenerationService>();
-builder.Services.AddScoped<ITextGenerationService, LlamaTextGenerationService>();
-builder.Services.AddScoped<ITextGenerationService, DeepSeekTextGenerationService>();
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 builder.Services.AddCors(options =>

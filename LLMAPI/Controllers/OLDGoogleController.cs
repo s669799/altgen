@@ -2,23 +2,27 @@ using LLMAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 using LLMAPI.DTO;
+using LLMAPI.Service.Interfaces;
 
 
 namespace LLMAPI.Controllers
 {
     [ApiController]
     [Route("api/google")]
-    public class GoogleController : ControllerBase
+    public class OLDGoogleController : ControllerBase
     {
-        private readonly IImageRecognitionService _imageRecognitionService;
+        private readonly IGoogleService _googleService;
         private readonly ITextGenerationService _textService;
+        private readonly IImageFileService _imageFileService;
 
-        public GoogleController(
-            IImageRecognitionService GoogleImageRecognitionService, 
-            ITextGenerationService GoogleTextGenerationService)
+        public OLDGoogleController(
+            IGoogleService googleService, 
+            ITextGenerationService textGenerationService, 
+            IImageFileService imageFileService)
         {
-            _imageRecognitionService = GoogleImageRecognitionService;
-            _textService = GoogleTextGenerationService;
+            _googleService = googleService;
+            _textService = textGenerationService;
+            _imageFileService = imageFileService;
         }
 
         /// <summary>
@@ -44,10 +48,10 @@ namespace LLMAPI.Controllers
                 string model = "gemini-2.0-flash-001";
 
                 // Convert the uploaded image file to a ByteString
-                var imageBytes = await _imageRecognitionService.ReadImageFileAsync(imageUrl);
+                var imageBytes = await _imageFileService.ReadImageFileAsync(imageUrl);
 
                 // Call the GenerateContent method with necessary parameters
-                var content = await _imageRecognitionService.GenerateContent(projectId, location, publisher, model, imageBytes);
+                var content = await _googleService.GenerateContent(projectId, location, publisher, model, imageBytes);
 
                 return Ok(new { ImageContent = content });
             }

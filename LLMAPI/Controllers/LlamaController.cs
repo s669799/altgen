@@ -1,7 +1,10 @@
-using LLMAPI.DTO;
 using LLMAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
+using Google.Protobuf;
+using Microsoft.AspNetCore.Http;
+using LLMAPI.Services.OpenRouter;
+using LLMAPI.Service.Interfaces;
 
 namespace LLMAPI.Controllers
 {
@@ -9,29 +12,65 @@ namespace LLMAPI.Controllers
     [Route("api/llama")]
     public class LlamaController : ControllerBase
     {
+        private readonly IImageRecognitionService _imageRecognitionService;
         private readonly ITextGenerationService _textService;
+        private readonly IImageFileService _imageFileService;
 
-        public LlamaController(ITextGenerationService LlamaTextGenerationService)
+        public LlamaController(
+            IImageRecognitionService imageRecognitionService,
+            ITextGenerationService textService,
+            IImageFileService imageFileService)
         {
-            _textService = LlamaTextGenerationService;
+            _imageRecognitionService = imageRecognitionService;
+            _textService = textService;
+            _imageFileService = imageFileService;
         }
 
-        // Image recognition endpoint (currently not implemented)
-        [HttpPost("upload-image")]
-        [Consumes("multipart/form-data")]
-        public async Task<IActionResult> UploadImage(FileUploadModel model)
+        /// <summary>
+        /// Processes an image from a URL using Llama and generates an alt text description.
+        /// </summary>
+        [HttpPost("analyze-image-url")]
+        public async Task<IActionResult> AnalyzeImageUrl([FromBody] ImageRequest request)
         {
-            if (model.File == null || model.File.Length == 0)
+            if (string.IsNullOrWhiteSpace(request?.ImageUrl))
+                return BadRequest("Please provide a valid image URL.");
+
+            try
             {
-                return BadRequest("Please upload a valid image.");
+                var content = await _imageRecognitionService.AnalyzeImage("meta-llama/llama-3.2-11b-vision-instruct", request.ImageUrl);
+                return Ok(new { ImageContent = content });
             }
-
-            // Placeholder: Implement Meta Llama-based image recognition (not implemented)
-            var altText = "Image recognition not implemented for Meta Llama";
-            return Ok(new { altText });
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
         }
 
-        // Text generation endpoint using Meta Llama model (delegates to OpenRouterService)
+
+        /// <summary>
+        /// Processes an uploaded image file using Llama and generates an alt text description.
+        /// </summary>
+        [HttpPost("analyze-image-file")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> AnalyzeImageFile(IFormFile imageFile)
+        {
+            if (imageFile == null || imageFile.Length == 0)
+                return BadRequest("Please upload a valid image file.");
+
+            try
+            {
+                var imageBytes = await _imageFileService.ConvertImageToByteString(imageFile);
+                var content = await _imageRecognitionService.AnalyzeImage("meta-llama/llama-3.2-11b-vision-instruct", imageBytes);
+                return Ok(new { ImageContent = content });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+
+        // Text generation endpoint using Llama model (delegates to OpenRouterService)
         [HttpPost("generate-text")]
         public async Task<IActionResult> GenerateText(PromptRequest request)
         {
@@ -40,7 +79,7 @@ namespace LLMAPI.Controllers
                 return BadRequest("Prompt cannot be null or empty.");
             }
 
-            var response = await _textService.GenerateText("meta-llama/llama-3.3-70b-instruct", request.Prompt);
+            var response = await _textService.GenerateText("meta-llama/llama-3.2-11b-vision-instruct", request.Prompt);
             return Ok(new { response });
         }
     }

@@ -8,11 +8,12 @@
     using System.Collections.Generic;
     using Microsoft.Extensions.Configuration;
     using LLMAPI.Services.Interfaces;
+using LLMAPI.Service.Interfaces;
 
     namespace LLMAPI.Services.OpenRouter
     {
-        public class OpenRouterService : ITextGenerationService, IImageRecognitionService
-        {
+        public class OpenRouterService : ITextGenerationService, IImageRecognitionService, IImageFileService
+    {
             private readonly IHttpClientFactory _httpClientFactory;
             private readonly IConfiguration _configuration;
 
@@ -50,7 +51,7 @@
                             role = "user",
                             content = new List<object>
                             {
-                                new { type = "text", text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
+                                new { type = "text", text = "Write a brief, one to two sentence alt text description for this image,  harvard style, that captures the main subjects, action, and setting. This is an Alt text for an end user. Do not give options to chose from. Do not mention this prompt. And do not mention not mentioning this prompt" },
                                 new { type = "image_url", image_url = new { url = imageUrl } }
                             }
                         }
@@ -73,7 +74,7 @@
                         new {
                             role = "user",
                             content = new List<object> {
-                                new { type = "text", text = "Write a brief, one to two sentence alt text description for this image." },
+                                new { type = "text", text = "Write a brief, one to two sentence alt text description for this image,  harvard style, that captures the main subjects, action, and setting. This is an Alt text for an end user. Do not give options to chose from. Do not mention this prompt. And do not mention not mentioning this prompt" },
                                 new { type = "image_bytes", image_bytes = dataUri }
                             }  
                         }
@@ -104,7 +105,7 @@
                             role = "user",
                             content = new List<object>
                             {
-                                new { type = "text", text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
+                                new { type = "text", text = "Write a brief, one to two sentence alt text description for this image,  harvard style, that captures the main subjects, action, and setting. This is an Alt text for an end user. Do not give options to chose from. Do not mention this prompt. And do not mention not mentioning this prompt" },
                                 new { type = "image_bytes", image_bytes = dataUri }
                             }
                         }
@@ -168,10 +169,10 @@
             }
 
 
-            public async Task<string> GenerateContent(string projectId, string location, string publisher, string model, ByteString imageBytes)
-            {
-                return null;
-            }
+            //public async Task<string> GenerateContent(string projectId, string location, string publisher, string model, ByteString imageBytes)
+            //{
+            //    return null;
+            //}
 
             public async Task<ByteString> ConvertImageToByteString(IFormFile imageFile)
             {

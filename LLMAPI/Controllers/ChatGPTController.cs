@@ -9,14 +9,14 @@ using LLMAPI.Service.Interfaces;
 namespace LLMAPI.Controllers
 {
     [ApiController]
-    [Route("api/claude")]
-    public class ClaudeController : ControllerBase
+    [Route("api/chatgpt")]
+    public class ChatGPTController : ControllerBase
     {
         private readonly IImageRecognitionService _imageRecognitionService;
         private readonly ITextGenerationService _textService;
         private readonly IImageFileService _imageFileService;
 
-        public ClaudeController(
+        public ChatGPTController(
             IImageRecognitionService imageRecognitionService,
             ITextGenerationService textService,
             IImageFileService imageFileService)
@@ -27,17 +27,17 @@ namespace LLMAPI.Controllers
         }
 
         /// <summary>
-        /// Processes an image from a URL using Claude and generates an alt text description.
+        /// Processes an image from a URL using ChatGPT and generates an alt text description.
         /// </summary>
         [HttpPost("analyze-image-url")]
         public async Task<IActionResult> AnalyzeImageUrl([FromBody] ImageRequest request)
         {
             if (string.IsNullOrWhiteSpace(request?.ImageUrl))
-            return BadRequest("Please provide a valid image URL.");
+                return BadRequest("Please provide a valid image URL.");
 
             try
             {
-                var content = await _imageRecognitionService.AnalyzeImage("anthropic/claude-3.5-sonnet", request.ImageUrl);
+                var content = await _imageRecognitionService.AnalyzeImage("openai/gpt-4o-mini", request.ImageUrl);
                 return Ok(new { ImageContent = content });
             }
             catch (Exception ex)
@@ -48,7 +48,7 @@ namespace LLMAPI.Controllers
 
 
         /// <summary>
-        /// Processes an uploaded image file using Claude and generates an alt text description.
+        /// Processes an uploaded image file using Llama and generates an alt text description.
         /// </summary>
         [HttpPost("analyze-image-file")]
         [Consumes("multipart/form-data")]
@@ -60,7 +60,7 @@ namespace LLMAPI.Controllers
             try
             {
                 var imageBytes = await _imageFileService.ConvertImageToByteString(imageFile);
-                var content = await _imageRecognitionService.AnalyzeImage("anthropic/claude-3.5-sonnet", imageBytes);
+                var content = await _imageRecognitionService.AnalyzeImage("openai/gpt-4o-mini", imageBytes);
                 return Ok(new { ImageContent = content });
             }
             catch (Exception ex)
@@ -69,8 +69,8 @@ namespace LLMAPI.Controllers
             }
         }
 
-        
-        // Text generation endpoint using Claude model (delegates to OpenRouterService)
+
+        // Text generation endpoint using Llama model (delegates to OpenRouterService)
         [HttpPost("generate-text")]
         public async Task<IActionResult> GenerateText(PromptRequest request)
         {
@@ -79,7 +79,7 @@ namespace LLMAPI.Controllers
                 return BadRequest("Prompt cannot be null or empty.");
             }
 
-            var response = await _textService.GenerateText("anthropic/claude-3.5-sonnet", request.Prompt);
+            var response = await _textService.GenerateText("openai/gpt-4o-mini", request.Prompt);
             return Ok(new { response });
         }
     }
