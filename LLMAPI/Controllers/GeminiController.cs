@@ -1,4 +1,4 @@
-//using LLMAPI.Services.Interfaces;
+﻿//using LLMAPI.Services.Interfaces;
 //using Microsoft.AspNetCore.Mvc;
 //using System.Threading.Tasks;
 //using Google.Protobuf;
@@ -9,14 +9,14 @@
 //namespace LLMAPI.Controllers
 //{
 //    [ApiController]
-//    [Route("api/chatgpt")]
-//    public class ChatGPTController : ControllerBase
+//    [Route("api/gemeni")]
+//    public class GeminiController : ControllerBase
 //    {
 //        private readonly IImageRecognitionService _imageRecognitionService;
 //        private readonly ITextGenerationService _textService;
 //        private readonly IImageFileService _imageFileService;
 
-//        public ChatGPTController(
+//        public GeminiController(
 //            IImageRecognitionService imageRecognitionService,
 //            ITextGenerationService textService,
 //            IImageFileService imageFileService)
@@ -27,7 +27,7 @@
 //        }
 
 //        /// <summary>
-//        /// Processes an image from a URL using ChatGPT and generates an alt text description.
+//        /// Processes an image from a URL using Gemeni and generates an alt text description.
 //        /// </summary>
 //        [HttpPost("analyze-image-url")]
 //        public async Task<IActionResult> AnalyzeImageUrl([FromBody] ImageRequest request)
@@ -37,7 +37,7 @@
 
 //            try
 //            {
-//                var content = await _imageRecognitionService.AnalyzeImage("openai/gpt-4o-mini", request.ImageUrl);
+//                var content = await _imageRecognitionService.AnalyzeImage("google/gemini-2.0-flash-001", request.ImageUrl);
 //                return Ok(new { ImageContent = content });
 //            }
 //            catch (Exception ex)
@@ -60,7 +60,7 @@
 //        //    try
 //        //    {
 //        //        var imageBytes = await _imageFileService.ConvertImageToByteString(imageFile);
-//        //        var content = await _imageRecognitionService.AnalyzeImage("openai/gpt-4o-mini", imageBytes);
+//        //        var content = await _imageRecognitionService.AnalyzeImage("google/gemini-2.0-flash-001", imageBytes);
 //        //        return Ok(new { ImageContent = content });
 //        //    }
 //        //    catch (Exception ex)
@@ -79,7 +79,7 @@
 //                return BadRequest("Prompt cannot be null or empty.");
 //            }
 
-//            var response = await _textService.GenerateText("openai/gpt-4o-mini", request.Prompt);
+//            var response = await _textService.GenerateText("google/gemini-2.0-flash-001", request.Prompt);
 //            return Ok(new { response });
 //        }
 //    }
