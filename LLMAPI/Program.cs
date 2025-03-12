@@ -24,8 +24,6 @@ builder.Services.AddSwaggerGen(c =>
     c.IncludeXmlComments(xmlPath);
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "API", Version = "v1" });
     c.OperationFilter<FileUploadOperationFilter>();
-    // Optionally add a document filter if you want to customize enum values.
-    // c.DocumentFilter<EnumDocumentFilter>(); 
     c.EnableAnnotations();
 });
 
