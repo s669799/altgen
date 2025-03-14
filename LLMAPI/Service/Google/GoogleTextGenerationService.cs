@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace LLMAPI.Services.Google
 {
+    [Obsolete("This service is deprecated and should not be used. It will be removed in a future update.")]
     public class GoogleTextGenerationService : ITextGenerationService
     {
         private readonly OpenRouterService _openRouterService;

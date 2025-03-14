@@ -5,48 +5,50 @@ namespace LLMAPI.Enums
     public enum ModelType
     {
         [EnumMember(Value = "openai/gpt-4o")]
-        ChatGPT_4o,
+        ChatGpt4o,
 
         [EnumMember(Value = "openai/gpt-4o-mini")]
-        ChatGPT_4o_Mini,
+        ChatGpt4oMini,
 
         [EnumMember(Value = "google/gemini-2.0-flash-001")]
-        Gemini_25_Flash,
+        Gemini2_5Flash,
 
         [EnumMember(Value = "google/gemini-2.0-flash-lite-001")]
-        Gemini_25_Flash_Lite,
+        Gemini2_5FlashLite,
 
         [EnumMember(Value = "anthropic/claude-3.5-sonnet")]
-        Claude_35_Sonnet,
+        Claude3_5Sonnet,
 
         [EnumMember(Value = "anthropic/claude-3-haiku")]
-        Claude_3_Haiku,
+        Claude3Haiku,
 
         [EnumMember(Value = "meta-llama/llama-3.2-90b-vision-instruct")]
-        Llama_32_90b_Vision_Instruct,
+        Llama3_2_90bVisionInstruct,
 
         [EnumMember(Value = "meta-llama/llama-3.2-11b-vision-instruct")]
-        Llama_32_11b_Vision_Instruct,
+        Llama3_2_11bVisionInstruct,
 
         [EnumMember(Value = "deepseek/deepseek-r1:free")]
-        DeepSeek_R1,
+        DeepSeekR1,
 
         [EnumMember(Value = "mistralai/pixtral-large-2411")]
-        Mistral_Pixtral_Large,
+        MistralPixtralLarge,
 
         [EnumMember(Value = "mistralai/pixtral-12b")]
-        Mistral_Pixtral_12b,
+        MistralPixtral12b,
 
         [EnumMember(Value = "qwen/qwen-vl-max")]
-        Qwen_VL_Max,
+        QwenVlMax,
 
         [EnumMember(Value = "qwen/qwen-2.5-vl-7b-instruct")]
-        Qwen_VL_7B_Instruct,
+        Qwen2_5Vl7bInstruct,
 
         [EnumMember(Value = "amazon/nova-lite-v1")]
-        Amazon_Nova_Lite_V1,
+        AmazonNovaLiteV1,
 
         [EnumMember(Value = "fireworks/firellava-13b")]
-        Fireworks_FireLlava_13B
+        FireworksFireLlava13b
     }
+
 }
+
