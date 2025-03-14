@@ -7,6 +7,7 @@ namespace LLMAPI.Services.Interfaces
     public interface IGoogleService
     {
         Task<string> AnalyzeImageGoogleVision(IFormFile imageFile);
-        Task<string> GenerateContent(string projectId, string location, string publisher, string model, ByteString imageBytes);
+        Task<string> AnalyzeImageGoogleVision(string imageUrl);
+        //Task<string> GenerateContent(string projectId, string location, string publisher, string model, ByteString imageBytes);
     }
 }

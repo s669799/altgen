@@ -50,47 +50,81 @@ namespace LLMAPI.Services.Google
             return altText.ToString();
         }
 
-        public async Task<string> GenerateContent(string projectId, string location, string publisher, string model, ByteString imageBytes)
+        public async Task<string> AnalyzeImageGoogleVision(string imageUrl)
         {
-            var predictionServiceClient = new PredictionServiceClientBuilder
+            try
             {
-                Endpoint = $"{location}-aiplatform.googleapis.com"
-            }.Build();
+                Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/rich-world-450914-e6-b6ee1b4424e9.json");
 
-/*             // Fetch the image from the URL
-            ByteString imageByteData = await ReadImageFileAsync(imageUrl); */
+                ByteString imageBytes = await ReadImageFileAsync(imageUrl);
+                var image = global::Google.Cloud.Vision.V1.Image.FromBytes(imageBytes.ToByteArray());
 
-            var generateContentRequest = new GenerateContentRequest
-            {
-                Model = $"projects/{projectId}/locations/{location}/publishers/{publisher}/models/{model}",
-                Contents =
+                var client = new ImageAnnotatorClientBuilder
                 {
-                    new Content
-                    {
-                        Role = "USER",
-                        Parts =
-                        {
-                            new Part { Text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
-                            new Part { InlineData = new() { MimeType = "image/png", Data = imageBytes } }
-                        }
-                    }
+                    GrpcAdapter = global::Google.Api.Gax.Grpc.Rest.RestGrpcAdapter.Default
+                }.Build();
+
+                var labels = await client.DetectLabelsAsync(image);
+
+                if (labels == null || labels.Count() == 0)
+                    return "No labels detected.";
+
+                var altText = new StringBuilder();
+                foreach (var label in labels)
+                {
+                    altText.AppendLine($"{label.Description} (Confidence: {label.Score:F2})");
                 }
-            };
 
-            using PredictionServiceClient.StreamGenerateContentStream response = predictionServiceClient.StreamGenerateContent(generateContentRequest);
-
-            StringBuilder fullText = new();
-
-            // Explicitly getting the response stream
-            AsyncResponseStream<GenerateContentResponse> responseStream = response.GetResponseStream();
-            await foreach (GenerateContentResponse responseItem in responseStream)
-            {
-                fullText.Append(responseItem.Candidates[0].Content.Parts[0].Text);
+                return altText.ToString();
             }
-
-            return fullText.ToString();
+            catch (Exception ex)
+            {
+                return $"Error processing image: {ex.Message}";
+            }
         }
-        
+
+
+        //        public async Task<string> GenerateContent(string projectId, string location, string publisher, string model, ByteString imageBytes)
+        //        {
+        //            var predictionServiceClient = new PredictionServiceClientBuilder
+        //            {
+        //                Endpoint = $"{location}-aiplatform.googleapis.com"
+        //            }.Build();
+
+        ///*             // Fetch the image from the URL
+        //            ByteString imageByteData = await ReadImageFileAsync(imageUrl); */
+
+        //            var generateContentRequest = new GenerateContentRequest
+        //            {
+        //                Model = $"projects/{projectId}/locations/{location}/publishers/{publisher}/models/{model}",
+        //                Contents =
+        //                {
+        //                    new Content
+        //                    {
+        //                        Role = "USER",
+        //                        Parts =
+        //                        {
+        //                            new Part { Text = "Write a brief, one to two sentence alt text description for this image that captures the main subjects, action, and setting." },
+        //                            new Part { InlineData = new() { MimeType = "image/png", Data = imageBytes } }
+        //                        }
+        //                    }
+        //                }
+        //            };
+
+        //            using PredictionServiceClient.StreamGenerateContentStream response = predictionServiceClient.StreamGenerateContent(generateContentRequest);
+
+        //            StringBuilder fullText = new();
+
+        //            // Explicitly getting the response stream
+        //            AsyncResponseStream<GenerateContentResponse> responseStream = response.GetResponseStream();
+        //            await foreach (GenerateContentResponse responseItem in responseStream)
+        //            {
+        //                fullText.Append(responseItem.Candidates[0].Content.Parts[0].Text);
+        //            }
+
+        //            return fullText.ToString();
+        //        }
+
         public async Task<ByteString> ConvertImageToByteString(IFormFile imageFile)
         {
             using var memoryStream = new MemoryStream();

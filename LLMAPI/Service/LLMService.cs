@@ -28,9 +28,7 @@ namespace LLMAPI.Service
         Task<string> GenerateContent(string projectId, string location, string publisher, string model);
     }
 
-    /// <summary>
-    /// Service class for handling different LLM models.
-    /// </summary>
+    [Obsolete("This controller is deprecated and should not be used. It will be removed in a future update.")]
     public class LLMService : ILLMService
     {
         private readonly IHttpClientFactory _httpClientFactory;
