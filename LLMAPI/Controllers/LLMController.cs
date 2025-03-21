@@ -67,5 +67,39 @@ namespace LLMAPI.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
+        [HttpPost("process-request-body")]
+        public async Task<IActionResult> ProcessRequestBody([FromBody] ImageRequest request)
+        {
+            // Validate input
+            if (request == null || (string.IsNullOrWhiteSpace(request.Prompt) && string.IsNullOrWhiteSpace(request.ImageUrl)))
+            {
+                return BadRequest("Please provide at least a prompt or an image URL.");
+            }
+
+            try
+            {
+                string responseContent;
+                string modelString = EnumHelper.GetEnumMemberValue(request.Model);
+
+                if (!string.IsNullOrWhiteSpace(request.ImageUrl))
+                {
+                    // Use default prompt if not provided
+                    string imagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt : request.Prompt;
+                    responseContent = await _imageRecognitionService.AnalyzeImage(modelString, request.ImageUrl, imagePrompt);
+                }
+                else
+                {
+                    responseContent = await _textService.GenerateText(modelString, request.Prompt);
+                }
+
+                return Ok(new { Response = responseContent });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
     }
 }

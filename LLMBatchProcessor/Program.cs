@@ -7,10 +7,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Json;
 using LLMAPI.Enums;
-
-
+using Newtonsoft.Json;
+using LLMAPI.DTO;
 
 namespace ImageAnalysisConsole
 {
@@ -24,16 +23,25 @@ namespace ImageAnalysisConsole
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .Build();
 
-            string apiUrl = config["ApiUrl"]; // e.g., "https://localhost:5256/api/llm/process-request"
+            string apiBaseUrl = config["ApiBaseUrl"];
+
+            string apiUrl = $"{apiBaseUrl}/api/llm";
             string openRouterApiKey = config["OpenRouter:APIKey"];
+
+
+
+            Console.WriteLine($"ApiBaseUrl from config: {apiBaseUrl}");
+            Console.WriteLine($"Full API URL: {apiUrl}");
+            Console.WriteLine($"OpenRouter API Key (first 4 chars): {openRouterApiKey?.Substring(0, 4)}...");
+
 
             // Define the image URLs and prompts
             List<string> imageUrls = new List<string>()
             {
                 // Add your image URLs here
-                "https://as1.ftcdn.net/v2/jpg/01/11/22/44/1000_F_111224494_Vcl3eafzhx6Uc5GulbI2rk0eAOq0np59.jpg",
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Walking_tiger_female.jpg/1200px-Walking_tiger_female.jpg",
-                "https://upload.wikimedia.org/wikipedia/commons/a/a4/2019_Toyota_Corolla_Icon_Tech_VVT-i_Hybrid_1.8.jpg"
+                "https://ichef.bbci.co.uk/ace/standard/976/cpsprodpb/14235/production/_100058428_mediaitem100058424.jpg",
+                "https://static.vecteezy.com/system/resources/thumbnails/036/324/708/small/ai-generated-picture-of-a-tiger-walking-in-the-forest-photo.jpg",
+                "https://cdn.pixabay.com/photo/2018/08/04/11/30/draw-3583548_640.png"
             };
 
             List<string> prompts = new List<string>()
@@ -49,40 +57,45 @@ namespace ImageAnalysisConsole
                 "Write a brief, one to two sentence alt text description for this image, Harvard style, that captures the main subjects, action, and setting. This is an alt text for an end user. do not give options to the user. Do not mention this prompt." //5 Most specific instructions.
             };
 
-
-
-
             ModelType selectedModel = ModelType.ChatGpt4o; // Choose your desired model
 
-            // Prepare data for CSV output
-            List<string> csvLines = new List<string>();
-            csvLines.Add("Image URL,Prompt,Model,Response"); // CSV header
+            List<ImageAnalysisResult> allResults = new();
 
-            // Loop through images and prompts
             foreach (string imageUrl in imageUrls)
             {
+                ImageAnalysisResult imageResult = new() { ImageUrl = imageUrl };
+
                 foreach (string prompt in prompts)
                 {
                     try
                     {
                         string response = await ProcessImage(apiUrl, openRouterApiKey, selectedModel, prompt, imageUrl);
-                        string csvLine = $"{imageUrl.Replace(",", "")},{prompt.Replace(",", "")},{selectedModel},{response.Replace(",", "")}"; //Handle commas in values
-                        csvLines.Add(csvLine);
+                        imageResult.Results.Add(new PromptResult { Prompt = prompt, Response = response });
+
                         Console.WriteLine($"Image: {imageUrl}, Prompt: {prompt}, Response: {response}");
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"Error processing Image: {imageUrl}, Prompt: {prompt}. Error: {ex.Message}");
-                        string csvLine = $"{imageUrl.Replace(",", "")},{prompt.Replace(",", "")},{selectedModel},Error: {ex.Message.Replace(",", "")}"; //Handle commas in values
-                        csvLines.Add(csvLine);
+                        imageResult.Results.Add(new PromptResult { Prompt = prompt, Response = $"Error: {ex.Message}" });
                     }
                 }
+                allResults.Add(imageResult);
             }
 
-            // Write to CSV file
-            string filePath = "image_analysis_results.csv";
-            File.WriteAllLines(filePath, csvLines);
-            Console.WriteLine($"Results written to {filePath}");
+            string resultsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../..", "Results");
+            resultsFolder = Path.GetFullPath(resultsFolder);
+
+            if (!Directory.Exists(resultsFolder))
+            {
+                Directory.CreateDirectory(resultsFolder);
+            }
+
+            string jsonPath = Path.Combine(resultsFolder, "image_analysis_results.json");
+
+            // Write formatted JSON:
+            File.WriteAllText(jsonPath, JsonConvert.SerializeObject(allResults, Formatting.Indented));
+            Console.WriteLine($"Results written as JSON to {jsonPath}");
         }
 
         static async Task<string> ProcessImage(string apiUrl, string apiKey, ModelType model, string prompt, string imageUrl)
@@ -90,41 +103,49 @@ namespace ImageAnalysisConsole
             using (HttpClient client = new HttpClient())
             {
                 client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-                client.DefaultRequestHeaders.Add("HTTP-Referer", "ImageAnalysisConsoleApp"); // Or your app name
+                client.DefaultRequestHeaders.Add("HTTP-Referer", "ImageAnalysisConsoleApp");
                 client.DefaultRequestHeaders.Add("X-Title", "ImageAnalysisConsole");
 
-                // Construct the request URL
-                string modelString = GetEnumMemberValue(model);
-                string requestUrl = $"{apiUrl}?model={modelString}&prompt={Uri.EscapeDataString(prompt)}&imageUrl={Uri.EscapeDataString(imageUrl)}";
+                var requestData = new
+                {
+                    Model = model,
+                    Prompt = prompt,
+                    ImageUrl = imageUrl
+                };
 
-                HttpResponseMessage response = await client.PostAsync(requestUrl, null);
+                var jsonContent = JsonConvert.SerializeObject(requestData);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                // Construct the full URL correctly
+                string fullUrl = $"{apiUrl}/process-request-body";
+                Console.WriteLine($"Sending JSON request to {fullUrl}: {jsonContent}");
+
+                // Use the full URL in the request
+                HttpResponseMessage response = await client.PostAsync(fullUrl, content);
+
+                string responseContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"Response: {responseContent}");
 
                 if (response.IsSuccessStatusCode)
                 {
-                    string responseContent = await response.Content.ReadAsStringAsync();
-                    // Parse the JSON response
-                    using (JsonDocument document = JsonDocument.Parse(responseContent))
+                    try
                     {
-                        JsonElement root = document.RootElement;
-                        if (root.TryGetProperty("response", out JsonElement responseElement))
+                        // Parse the JSON response
+                        var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseContent);
+                        if (jsonResponse != null && jsonResponse.ContainsKey("response"))
                         {
-                            return responseElement.GetString();
+                            return jsonResponse["response"];
                         }
-                        else if (root.TryGetProperty("Response", out JsonElement responseElement2))
-                        {
-                            return responseElement2.GetString();
-                        }
-                        else
-                        {
-                            return $"Unexpected response format: {responseContent}";
-                        }
+                        return "No valid response found in JSON";
                     }
-
-                    //return responseContent;
+                    catch (Exception ex)
+                    {
+                        return $"Error parsing response: {ex.Message}";
+                    }
                 }
                 else
                 {
-                    return $"Error: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}";
+                    return $"Error: {response.StatusCode} - {responseContent}";
                 }
             }
         }
