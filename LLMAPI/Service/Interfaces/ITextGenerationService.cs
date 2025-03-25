@@ -2,6 +2,9 @@ using System.Threading.Tasks;
 
 namespace LLMAPI.Services.Interfaces
 {
+    /// <summary>
+    /// Interface defining the contract for text generation services.
+    /// </summary>
     public interface ITextGenerationService
     {
         /// <summary>

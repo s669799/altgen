@@ -10,6 +10,11 @@ using Microsoft.Extensions.Configuration;
 using LLMAPI.Enums;
 using Newtonsoft.Json;
 using LLMAPI.DTO;
+using CsvHelper;
+using CsvHelper.Configuration;
+using System.Globalization;
+using System.Formats.Asn1;
+using Google.Cloud.Storage.V1;
 
 namespace ImageAnalysisConsole
 {
@@ -17,85 +22,141 @@ namespace ImageAnalysisConsole
     {
         static async Task Main(string[] args)
         {
-            // Load configuration
             var config = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .Build();
 
             string apiBaseUrl = config["ApiBaseUrl"];
-
             string apiUrl = $"{apiBaseUrl}/api/llm";
             string openRouterApiKey = config["OpenRouter:APIKey"];
-
-
 
             Console.WriteLine($"ApiBaseUrl from config: {apiBaseUrl}");
             Console.WriteLine($"Full API URL: {apiUrl}");
             Console.WriteLine($"OpenRouter API Key (first 4 chars): {openRouterApiKey?.Substring(0, 4)}...");
 
+            string bucketName = "altgen_dam_bucket";
+            string folderPath = "Cifar-10/sample10";
+            List<string> imageUrls = await GetImageUrlsFromBucket(bucketName, folderPath);
 
-            // Define the image URLs and prompts
-            List<string> imageUrls = new List<string>()
+            if (imageUrls.Count == 0)
             {
-                // Add your image URLs here
-                "https://ichef.bbci.co.uk/ace/standard/976/cpsprodpb/14235/production/_100058428_mediaitem100058424.jpg",
-                "https://static.vecteezy.com/system/resources/thumbnails/036/324/708/small/ai-generated-picture-of-a-tiger-walking-in-the-forest-photo.jpg",
-                "https://cdn.pixabay.com/photo/2018/08/04/11/30/draw-3583548_640.png"
-            };
+                Console.WriteLine($"No images found in bucket '{bucketName}' or an error occurred. Please check the bucket name and permissions.");
+                return;
+            }
 
+            Console.WriteLine($"Found {imageUrls.Count} images in bucket '{bucketName}/{folderPath}'.");
+
+            // List of prompts for the request, ranging from simple to more complex and demanding.
             List<string> prompts = new List<string>()
             {
-                "Write an alt text for this image.",//1 Simplest and most general prompt.
-
-                "Write a brief alt text, one sentence if possible, describing the main subject of this image.", //2 More constrained length & focuses on main subject for alt text
-
-                "Write a brief alt text describing the key objects in this image and hint about its setting.", //3 Introduces key objects + a hint of the setting in the alt text
-
-                "Write a one to two sentence alt text that identifies the setting and action taking place in this image, suitable for an end user.", //4 More specific length, content (setting/action), and hints audience
-
-                "Write a brief, one to two sentence alt text description for this image, Harvard style, that captures the main subjects, action, and setting. This is an alt text for an end user. do not give options to the user. Do not mention this prompt." //5 Most specific instructions.
+                "Write an alt text for this image.",
+                "Write a concise alt text identifying the key subjects or objects in this image and briefly describe the setting or context.",
+                "Generate an accessible alt text for this image, adhering to best practices for web accessibility.  The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image.  Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message.  Consider the likely purpose and context of the image when writing the alt text to ensure relevance.  Do not include redundant phrases like 'image of' or 'picture of'.  Focus on delivering informative content."
             };
 
-            ModelType selectedModel = ModelType.ChatGpt4o; // Choose your desired model
-
-            List<ImageAnalysisResult> allResults = new();
-
-            foreach (string imageUrl in imageUrls)
+            List<ModelType> modelsToTest = new List<ModelType>()
             {
-                ImageAnalysisResult imageResult = new() { ImageUrl = imageUrl };
+                ModelType.ChatGpt4o,
+                ModelType.ChatGpt4oMini,
+                ModelType.Gemini2_5Flash,
+                ModelType.Gemini2_5FlashLite,
+                ModelType.Claude3_5Sonnet,
+                ModelType.Claude3Haiku,
+                ModelType.Qwen2_5Vl72bInstruct,
+                ModelType.Qwen2_5Vl7bInstruct
+            };
 
-                foreach (string prompt in prompts)
+            string baseResultsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../..", "Results");
+            baseResultsFolder = Path.GetFullPath(baseResultsFolder);
+
+            if (!Directory.Exists(baseResultsFolder))
+            {
+                Directory.CreateDirectory(baseResultsFolder);
+            }
+
+            // Construct timestamped folder name including bucket and path
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string folderPathForName = string.IsNullOrEmpty(folderPath) ? "bucket_root" : folderPath.Replace('/', '_'); // Replace slashes with underscores
+            string timestampFolderName = $"{timestamp}_{bucketName}_{folderPathForName}";
+            string resultsFolder = Path.Combine(baseResultsFolder, timestampFolderName);
+            Directory.CreateDirectory(resultsFolder); // Create the new folder
+
+            // Output folder name, bucket name, and folder path at the start
+            Console.WriteLine($"\n--- Run Information ---");
+            Console.WriteLine($"  Results Folder: {resultsFolder}");
+            Console.WriteLine($"  Bucket Name:    {bucketName}");
+            Console.WriteLine($"  Bucket Folder:  {folderPath ?? "(Bucket Root)"}"); // Handle null folderPath
+
+            foreach (var selectedModel in modelsToTest)
+            {
+                List<ImageAnalysisResult> allResults = new();
+
+                // CSV Setup
+                string modelNameForFile = selectedModel.ToString();
+                string csvPath = Path.Combine(resultsFolder, $"image_analysis_results_{modelNameForFile}.csv"); // Files in timestamped subfolder
+
+                using (var writer = new StreamWriter(csvPath))
+                using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
                 {
-                    try
-                    {
-                        string response = await ProcessImage(apiUrl, openRouterApiKey, selectedModel, prompt, imageUrl);
-                        imageResult.Results.Add(new PromptResult { Prompt = prompt, Response = response });
+                    // Write CSV header
+                    csv.WriteHeader<CsvOutputRecord>();
+                    csv.NextRecord();
 
-                        Console.WriteLine($"Image: {imageUrl}, Prompt: {prompt}, Response: {response}");
-                    }
-                    catch (Exception ex)
+                    Console.WriteLine($"\n--- Testing Model: {selectedModel} ---");
+
+                    foreach (string imageUrl in imageUrls)
                     {
-                        Console.WriteLine($"Error processing Image: {imageUrl}, Prompt: {prompt}. Error: {ex.Message}");
-                        imageResult.Results.Add(new PromptResult { Prompt = prompt, Response = $"Error: {ex.Message}" });
+                        ImageAnalysisResult imageResult = new() { ImageUrl = imageUrl };
+
+                        foreach (string prompt in prompts)
+                        {
+                            try
+                            {
+                                string response = await ProcessImage(apiUrl, openRouterApiKey, selectedModel, prompt, imageUrl);
+                                imageResult.Results.Add(new PromptResult { Prompt = prompt, Response = response });
+
+                                // Write CSV record
+                                csv.WriteRecord(new CsvOutputRecord
+                                {
+                                    Model = selectedModel,
+                                    ImageUrl = imageUrl,
+                                    Prompt = prompt,
+                                    Response = response
+                                });
+                                csv.NextRecord();
+
+                                Console.WriteLine($"Model: {selectedModel}, Image: {imageUrl}, Prompt: {prompt}, Response: {response.Substring(0, Math.Min(response.Length, 100))}...");
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error processing Model: {selectedModel}, Image: {imageUrl}, Prompt: {prompt}. Error: {ex.Message}");
+                                imageResult.Results.Add(new PromptResult { Prompt = prompt, Response = $"Error: {ex.Message}" });
+
+                                // Write CSV record for error case
+                                csv.WriteRecord(new CsvOutputRecord
+                                {
+                                    Model = selectedModel,
+                                    ImageUrl = imageUrl,
+                                    Prompt = prompt,
+                                    Response = $"Error: {ex.Message}"
+                                });
+                                csv.NextRecord();
+                            }
+                        }
+                        allResults.Add(imageResult);
                     }
-                }
-                allResults.Add(imageResult);
+                } // CSV writer will be flushed and closed here
+
+
+                // JSON Output - Files in timestamped subfolder
+                string jsonPath = Path.Combine(resultsFolder, $"image_analysis_results_{modelNameForFile}.json");
+                File.WriteAllText(jsonPath, JsonConvert.SerializeObject(allResults, Formatting.Indented));
+                Console.WriteLine($"Results for {selectedModel} written as JSON to {jsonPath}");
+                Console.WriteLine($"Results for {selectedModel} written as CSV to {csvPath}");
             }
 
-            string resultsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../..", "Results");
-            resultsFolder = Path.GetFullPath(resultsFolder);
-
-            if (!Directory.Exists(resultsFolder))
-            {
-                Directory.CreateDirectory(resultsFolder);
-            }
-
-            string jsonPath = Path.Combine(resultsFolder, "image_analysis_results.json");
-
-            // Write formatted JSON:
-            File.WriteAllText(jsonPath, JsonConvert.SerializeObject(allResults, Formatting.Indented));
-            Console.WriteLine($"Results written as JSON to {jsonPath}");
+            Console.WriteLine("\nAll model tests completed. Results saved in the Results folder.");
         }
 
         static async Task<string> ProcessImage(string apiUrl, string apiKey, ModelType model, string prompt, string imageUrl)
@@ -118,13 +179,10 @@ namespace ImageAnalysisConsole
 
                 // Construct the full URL correctly
                 string fullUrl = $"{apiUrl}/process-request-body";
-                Console.WriteLine($"Sending JSON request to {fullUrl}: {jsonContent}");
 
-                // Use the full URL in the request
                 HttpResponseMessage response = await client.PostAsync(fullUrl, content);
 
                 string responseContent = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"Response: {responseContent}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -165,6 +223,38 @@ namespace ImageAnalysisConsole
                 }
             }
             return value.ToString();
+        }
+
+        static async Task<List<string>> GetImageUrlsFromBucket(string bucketName, string folderPath = null)
+        {
+            var storageClient = await StorageClient.CreateAsync();
+            var imageUrls = new List<string>();
+
+            try
+            {
+                // If folderPath is provided, list objects with that prefix; otherwise list from the bucket root
+                var objectList = string.IsNullOrEmpty(folderPath)
+                    ? storageClient.ListObjectsAsync(bucketName)
+                    : storageClient.ListObjectsAsync(bucketName, prefix: folderPath);
+
+                await foreach (var storageObject in objectList)
+                {
+                    // Check if the object is likely an image (you can refine this check if needed)
+                    if (storageObject.ContentType.StartsWith("image/"))
+                    {
+                        // Construct the public URL for the object in Google Cloud Storage
+                        string imageUrl = $"https://storage.googleapis.com/{bucketName}/{storageObject.Name}";
+                        imageUrls.Add(imageUrl);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error listing objects in bucket {bucketName} (folder: {folderPath}): {ex.Message}");
+                return new List<string>(); // Return empty list on error
+            }
+
+            return imageUrls;
         }
     }
 }

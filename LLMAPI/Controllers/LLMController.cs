@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 
 namespace LLMAPI.Controllers
 {
+    /// <summary>
+    /// API controller for handling Language Learning Model (LLM) requests, including text generation and image analysis.
+    /// </summary>
     [ApiController]
     [Route("api/llm")]
     public class LLMController : ControllerBase
@@ -17,9 +20,18 @@ namespace LLMAPI.Controllers
         private readonly ITextGenerationService _textService;
         private readonly IImageFileService _imageFileService;
 
-        // Default prompt for image analysis.
-        private const string DefaultAltTextPrompt = "Write a brief, one to two sentence alt text description for this image, Harvard style, that captures the main subjects, action, and setting. This is an alt text for an end user.";
+        /// <summary>
+        /// Default prompt used for image analysis when no specific prompt is provided in the request.
+        /// This prompt is designed to generate accessible and informative alt text descriptions for images, following web accessibility best practices.
+        /// </summary>
+        private const string DefaultAltTextPrompt = "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or **introduction.  Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar.**";
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LLMController"/> class.
+        /// </summary>
+        /// <param name="imageRecognitionService">Service for performing image recognition tasks.</param>
+        /// <param name="textService">Service for handling text generation requests.</param>
+        /// <param name="imageFileService">Service for managing image files (currently not in use in this controller, but could be used for future image file operations).</param>
         public LLMController(
             IImageRecognitionService imageRecognitionService,
             ITextGenerationService textService,
@@ -31,9 +43,20 @@ namespace LLMAPI.Controllers
         }
 
         /// <summary>
-        /// Processes a text or image request based on the provided model, prompt, and image URL.
+        /// Processes a Language Learning Model (LLM) request using query parameters to specify the model, prompt, and/or image URL.
+        /// At least a prompt or an image URL must be provided.
         /// </summary>
+        /// <param name="model">The LLM model to use for processing the request. This is selected via a dropdown in Swagger UI.</param>
+        /// <param name="prompt">Optional text prompt to send to the LLM for text generation or to guide image analysis. If not provided for image analysis, a default alt text prompt will be used.</param>
+        /// <param name="imageUrl">Optional URL of an image to be analyzed by the LLM. If provided, the LLM will perform image recognition and analysis.</param>
+        /// <returns>IActionResult containing the LLM's response in the `Response` property. Returns BadRequest if no prompt or imageUrl is provided, or StatusCode 500 for internal server errors.</returns>
+        /// <response code="200">Returns the LLM response successfully.</response>
+        /// <response code="400">Returns if the request is invalid, e.g., no prompt or image URL provided.</response>
+        /// <response code="500">Returns if there is an internal server error during processing.</response>
         [HttpPost("process-request")]
+        [ProducesResponseType(typeof(object), 200)] // Specify the expected response type for 200 OK
+        [ProducesResponseType(typeof(string), 400)] // Specify the expected response type for 400 BadRequest (or just IActionResult if details are not needed)
+        [ProducesResponseType(typeof(string), 500)] // Specify the expected response type for 500 InternalServerError (or just IActionResult)
         public async Task<IActionResult> ProcessRequest(
             [FromQuery] ModelType model,  // Dropdown in Swagger
             [FromQuery] string? prompt,   // Optional text prompt
@@ -68,7 +91,19 @@ namespace LLMAPI.Controllers
             }
         }
 
+        /// <summary>
+        /// Processes a Language Learning Model (LLM) request using the request body to send an <see cref="ImageRequest"/> object.
+        /// This endpoint is suitable for sending requests via POST with a JSON body.
+        /// </summary>
+        /// <param name="request">The <see cref="ImageRequest"/> object in the request body. This object should contain the model, prompt, and/or image URL. At least a prompt or an image URL must be provided within the request body.</param>
+        /// <returns>IActionResult containing the LLM's response in the `Response` property. Returns BadRequest if the request body is invalid or missing essential data, or StatusCode 500 for internal server errors.</returns>
+        /// <response code="200">Returns the LLM response successfully.</response>
+        /// <response code="400">Returns if the request body is invalid, e.g., missing prompt or image URL, or if the request object itself is null.</response>
+        /// <response code="500">Returns if there is an internal server error during processing.</response>
         [HttpPost("process-request-body")]
+        [ProducesResponseType(typeof(object), 200)] // Specify the expected response type for 200 OK
+        [ProducesResponseType(typeof(string), 400)] // Specify the expected response type for 400 BadRequest (or just IActionResult if details are not needed)
+        [ProducesResponseType(typeof(string), 500)] // Specify the expected response type for 500 InternalServerError (or just IActionResult)
         public async Task<IActionResult> ProcessRequestBody([FromBody] ImageRequest request)
         {
             // Validate input
@@ -100,6 +135,5 @@ namespace LLMAPI.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-
     }
 }
