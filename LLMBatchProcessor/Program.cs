@@ -49,28 +49,29 @@ namespace ImageAnalysisConsole
             {
                 "imagenet-sample-images/imagenet10",        // Options: imagenet10, imagenet20, imagenet50
                 "Cifar-10/sample10",                        // Options: sample10, sample30, sample100 (now with subfolder support)
-                "airplanes"                                 // Options : airplanes (20 images)
+                "airplanes",                                // Options: airplanes (20 images)
+                "random-images"                             // Options: random-images (10 images)
             };
 
             // List of prompts for the request.
             List<string> prompts = new List<string>()
             {
                 "Write an alt text for this image.",
-                //"Write a concise alt text identifying the key subjects or objects in this image and briefly describe the setting or context.",
-                //"Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar."
+                "Write a concise alt text identifying the key subjects or objects in this image and briefly describe the setting or context.",
+                "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar."
             };
 
             // List of ModelType enums representing the Large Language Models to be tested.
             List<ModelType> modelsToTest = new List<ModelType>()
             {
                 ModelType.ChatGpt4o,
-                //ModelType.ChatGpt4oMini,
-                //ModelType.Gemini2_5Flash,
-                //ModelType.Gemini2_5FlashLite,
-                //ModelType.Claude3_5Sonnet,
-                //ModelType.Claude3Haiku,
-                //ModelType.Qwen2_5Vl72bInstruct,
-                //ModelType.Qwen2_5Vl7bInstruct
+                ModelType.ChatGpt4oMini,
+                ModelType.Gemini2_5Flash,
+                ModelType.Gemini2_5FlashLite,
+                ModelType.Claude3_5Sonnet,
+                ModelType.Claude3Haiku,
+                ModelType.Qwen2_5Vl72bInstruct,
+                ModelType.Qwen2_5Vl7bInstruct
             };
 
             string baseResultsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../..", "Results");
