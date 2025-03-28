@@ -120,7 +120,7 @@ namespace LLMAPI.Controllers
                 if (!string.IsNullOrWhiteSpace(request.ImageUrl))
                 {
                     // Use default prompt if not provided
-                    string imagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt : prompt;
+                    string imagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt : request.Prompt;
                     responseContent = await _imageRecognitionService.AnalyzeImage(modelString, request.ImageUrl, imagePrompt);
                 }
                 else
