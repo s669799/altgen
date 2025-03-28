@@ -20,12 +20,12 @@ namespace ImageAnalysisConsole
 {
     /// <summary>
     /// Console application to perform image analysis using a configured API, testing various Large Language Models (LLMs)
-    /// against images fetched from a Google Cloud Storage bucket. Results are saved in CSV and JSON format, with support for processing multiple folders and improved console output readability.
+    /// against images fetched from a Google Cloud Storage bucket. Results are saved in CSV and JSON format, with support for processing multiple folders and subfolders, and improved console output readability.
     /// </summary>
     class Program
     {
         /// <summary>
-        /// Main entry point of the console application. Configures the application, fetches images from specified folders in a bucket,
+        /// Main entry point of the console application. Configures the application, fetches images from specified folders and their subfolders in a bucket,
         /// tests specified LLMs against these images, and saves the analysis results in separate folders for each processed folder path.
         /// </summary>
         /// <param name="args">Command line arguments (not used in this application).</param>
@@ -48,29 +48,29 @@ namespace ImageAnalysisConsole
             List<string> folderPaths = new List<string>()
             {
                 "imagenet-sample-images/imagenet10",        // Options: imagenet10, imagenet20, imagenet50
-                "Cifar-10/sample10",                        // Options: sample10, sample30, sample100 
+                "Cifar-10/sample10",                        // Options: sample10, sample30, sample100 (now with subfolder support)
                 "airplanes"                                 // Options : airplanes (20 images)
             };
 
-            // List of prompts for the request, ranging from simple to more complex and demanding for alt text generation.
+            // List of prompts for the request.
             List<string> prompts = new List<string>()
             {
                 "Write an alt text for this image.",
-                "Write a concise alt text identifying the key subjects or objects in this image and briefly describe the setting or context.",
-                "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar."
+                //"Write a concise alt text identifying the key subjects or objects in this image and briefly describe the setting or context.",
+                //"Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar."
             };
 
             // List of ModelType enums representing the Large Language Models to be tested.
             List<ModelType> modelsToTest = new List<ModelType>()
             {
                 ModelType.ChatGpt4o,
-                ModelType.ChatGpt4oMini,
-                ModelType.Gemini2_5Flash,
-                ModelType.Gemini2_5FlashLite,
-                ModelType.Claude3_5Sonnet,
-                ModelType.Claude3Haiku,
-                ModelType.Qwen2_5Vl72bInstruct,
-                ModelType.Qwen2_5Vl7bInstruct
+                //ModelType.ChatGpt4oMini,
+                //ModelType.Gemini2_5Flash,
+                //ModelType.Gemini2_5FlashLite,
+                //ModelType.Claude3_5Sonnet,
+                //ModelType.Claude3Haiku,
+                //ModelType.Qwen2_5Vl72bInstruct,
+                //ModelType.Qwen2_5Vl7bInstruct
             };
 
             string baseResultsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../..", "Results");
@@ -265,22 +265,35 @@ namespace ImageAnalysisConsole
         }
 
         /// <summary>
-        /// Retrieves a list of image URLs from a Google Cloud Storage bucket, optionally filtering by a folder path.
+        /// Retrieves a list of image URLs from a Google Cloud Storage bucket, including images from **within the specified folder and all its subfolders**.
+        /// Returns the count of images found in the logs.
         /// </summary>
         /// <param name="bucketName">The name of the GCS bucket to access.</param>
-        /// <param name="folderPath">Optional. If specified, only images within this folder are listed. If null or empty, images from the bucket root are listed.</param>
-        /// <returns>A List of strings, each being a publicly accessible URL for an image in the specified GCS bucket and folder. Returns an empty list if no images are found or an error occurs.</returns>
+        /// <param name="folderPath">Optional. If specified, images from **this folder and all subfolders** are listed. If null or empty, images from the bucket root are listed.</param>
+        /// <returns>A List of strings, each being a publicly accessible URL for an image in the specified GCS bucket and folder (or subfolder). Returns an empty list if no images are found or an error occurs.</returns>
         static async Task<List<string>> GetImageUrlsFromBucket(string bucketName, string folderPath = null)
         {
             var storageClient = await StorageClient.CreateAsync();
             var imageUrls = new List<string>();
+            int imageCount = 0; // Initialize image counter
 
             try
             {
-                // List objects in the bucket, optionally with a prefix for folder path.
-                var objectList = string.IsNullOrEmpty(folderPath)
+                string prefix = folderPath;
+                if (!string.IsNullOrEmpty(prefix))
+                {
+                    // Ensure the prefix ends with a '/' to only match within the folder
+                    if (!prefix.EndsWith("/"))
+                    {
+                        prefix += "/";
+                    }
+                }
+
+                // List objects in the bucket, using the potentially modified prefix.
+                var objectList = string.IsNullOrEmpty(prefix)
                     ? storageClient.ListObjectsAsync(bucketName)
-                    : storageClient.ListObjectsAsync(bucketName, prefix: folderPath);
+                    : storageClient.ListObjectsAsync(bucketName, prefix: prefix);
+
 
                 await foreach (var storageObject in objectList)
                 {
@@ -290,8 +303,10 @@ namespace ImageAnalysisConsole
                         // Construct the public URL for accessing the image.
                         string imageUrl = $"https://storage.googleapis.com/{bucketName}/{storageObject.Name}";
                         imageUrls.Add(imageUrl);
+                        imageCount++; // Increment the image count
                     }
                 }
+                Console.WriteLine($"    Found {imageCount} images in folder and subfolders."); // Output total count of images found, now including subfolders
             }
             catch (Exception ex)
             {
