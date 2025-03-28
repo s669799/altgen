@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace LLMAPI.Controllers
 {
     /// <summary>
-    /// API controller for handling Language Learning Model (LLM) requests, including text generation and image analysis.
+    /// API controller for handling LLM requests, including text generation and image analysis.
     /// </summary>
     [ApiController]
     [Route("api/llm")]
@@ -43,7 +43,7 @@ namespace LLMAPI.Controllers
         }
 
         /// <summary>
-        /// Processes a Language Learning Model (LLM) request using query parameters to specify the model, prompt, and/or image URL.
+        /// Processes a LLM request using query parameters to specify the model, prompt, and/or image URL.
         /// At least a prompt or an image URL must be provided.
         /// </summary>
         /// <param name="model">The LLM model to use for processing the request. This is selected via a dropdown in Swagger UI.</param>
@@ -54,13 +54,13 @@ namespace LLMAPI.Controllers
         /// <response code="400">Returns if the request is invalid, e.g., no prompt or image URL provided.</response>
         /// <response code="500">Returns if there is an internal server error during processing.</response>
         [HttpPost("process-request")]
-        [ProducesResponseType(typeof(object), 200)] // Specify the expected response type for 200 OK
-        [ProducesResponseType(typeof(string), 400)] // Specify the expected response type for 400 BadRequest (or just IActionResult if details are not needed)
-        [ProducesResponseType(typeof(string), 500)] // Specify the expected response type for 500 InternalServerError (or just IActionResult)
+        [ProducesResponseType(typeof(object), 200)]
+        [ProducesResponseType(typeof(string), 400)]
+        [ProducesResponseType(typeof(string), 500)]
         public async Task<IActionResult> ProcessRequest(
-            [FromQuery] ModelType model,  // Dropdown in Swagger
-            [FromQuery] string? prompt,   // Optional text prompt
-            [FromQuery] string? imageUrl) // Optional image URL
+            [FromQuery] ModelType model,
+            [FromQuery] string? prompt,
+            [FromQuery] string? imageUrl)
         {
             // Validate input: At least one of `prompt` or `imageUrl` must be provided
             if (string.IsNullOrWhiteSpace(prompt) && string.IsNullOrWhiteSpace(imageUrl))
@@ -92,7 +92,7 @@ namespace LLMAPI.Controllers
         }
 
         /// <summary>
-        /// Processes a Language Learning Model (LLM) request using the request body to send an <see cref="ImageRequest"/> object.
+        /// Processes a LLM request using the request body to send an <see cref="ImageRequest"/> object.
         /// This endpoint is suitable for sending requests via POST with a JSON body.
         /// </summary>
         /// <param name="request">The <see cref="ImageRequest"/> object in the request body. This object should contain the model, prompt, and/or image URL. At least a prompt or an image URL must be provided within the request body.</param>
@@ -101,9 +101,9 @@ namespace LLMAPI.Controllers
         /// <response code="400">Returns if the request body is invalid, e.g., missing prompt or image URL, or if the request object itself is null.</response>
         /// <response code="500">Returns if there is an internal server error during processing.</response>
         [HttpPost("process-request-body")]
-        [ProducesResponseType(typeof(object), 200)] // Specify the expected response type for 200 OK
-        [ProducesResponseType(typeof(string), 400)] // Specify the expected response type for 400 BadRequest (or just IActionResult if details are not needed)
-        [ProducesResponseType(typeof(string), 500)] // Specify the expected response type for 500 InternalServerError (or just IActionResult)
+        [ProducesResponseType(typeof(object), 200)]
+        [ProducesResponseType(typeof(string), 400)]
+        [ProducesResponseType(typeof(string), 500)]
         public async Task<IActionResult> ProcessRequestBody([FromBody] ImageRequest request)
         {
             // Validate input
@@ -120,7 +120,7 @@ namespace LLMAPI.Controllers
                 if (!string.IsNullOrWhiteSpace(request.ImageUrl))
                 {
                     // Use default prompt if not provided
-                    string imagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt : request.Prompt;
+                    string imagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt : prompt;
                     responseContent = await _imageRecognitionService.AnalyzeImage(modelString, request.ImageUrl, imagePrompt);
                 }
                 else

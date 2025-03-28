@@ -21,13 +21,13 @@ namespace LLMAPI.Enums
         ChatGpt4oMini,
 
         /// <summary>
-        /// Google's Gemini 2.5 Flash model.
+        /// Google's Gemini 2.0 Flash model.
         /// </summary>
         [EnumMember(Value = "google/gemini-2.0-flash-001")]
         Gemini2_5Flash,
 
         /// <summary>
-        /// Google's Gemini 2.5 Flash Lite model.
+        /// Google's Gemini 2.0 Flash Lite model.
         /// </summary>
         [EnumMember(Value = "google/gemini-2.0-flash-lite-001")]
         Gemini2_5FlashLite,

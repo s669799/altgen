@@ -14,15 +14,28 @@ using LLMAPI.Service.Interfaces;
 
 namespace LLMAPI.Services.Google
 {
+    /// <summary>
+    /// Service to handle image recognition tasks using Google Cloud Vision API.
+    /// Implements interfaces for both Google-specific services and image file handling.
+    /// </summary>
     public class GoogleImageRecognitionService : IGoogleService, IImageFileService
     {
         private readonly IConfiguration _configuration;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GoogleImageRecognitionService"/> class.
+        /// </summary>
+        /// <param name="configuration">Application configuration provider.</param>
         public GoogleImageRecognitionService(IConfiguration configuration)
         {
             _configuration = configuration;
         }
 
+        /// <summary>
+        /// Analyzes an image file uploaded via HTTP using Google Vision API Label Detection.
+        /// </summary>
+        /// <param name="imageFile">The image file uploaded as <see cref="IFormFile"/>.</param>
+        /// <returns>A string containing labels detected by Google Vision API, along with their confidence scores. Returns "No labels detected." if no labels are found.</returns>
         public async Task<string> AnalyzeImageGoogleVision(IFormFile imageFile)
         {
             Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", @"keys/rich-world-450914-e6-b6ee1b4424e9.json");
@@ -50,6 +63,11 @@ namespace LLMAPI.Services.Google
             return altText.ToString();
         }
 
+        /// <summary>
+        /// Analyzes an image from a given URL using Google Vision API Label Detection.
+        /// </summary>
+        /// <param name="imageUrl">The URL of the image to be analyzed.</param>
+        /// <returns>A string containing labels detected by Google Vision API, along with their confidence scores. Returns "No labels detected." if no labels are found, or an error message if processing fails.</returns>
         public async Task<string> AnalyzeImageGoogleVision(string imageUrl)
         {
             try
@@ -125,6 +143,11 @@ namespace LLMAPI.Services.Google
         //            return fullText.ToString();
         //        }
 
+        /// <summary>
+        /// Converts an <see cref="IFormFile"/> image to a <see cref="ByteString"/>.
+        /// </summary>
+        /// <param name="imageFile">The image file uploaded via HTTP.</param>
+        /// <returns>The image content as a ByteString.</returns>
         public async Task<ByteString> ConvertImageToByteString(IFormFile imageFile)
         {
             using var memoryStream = new MemoryStream();
@@ -132,6 +155,11 @@ namespace LLMAPI.Services.Google
             return ByteString.CopyFrom(memoryStream.ToArray());
         }
 
+        /// <summary>
+        /// Reads an image from a URL and converts it to a <see cref="ByteString"/>.
+        /// </summary>
+        /// <param name="url">The URL of the image.</param>
+        /// <returns>The image content as a ByteString.</returns>
         public async Task<ByteString> ReadImageFileAsync(string url)
         {
             using HttpClient client = new();
@@ -139,6 +167,5 @@ namespace LLMAPI.Services.Google
             byte[] imageBytes = await response.Content.ReadAsByteArrayAsync();
             return ByteString.CopyFrom(imageBytes);
         }
-
     }
 }

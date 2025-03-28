@@ -10,6 +10,10 @@ using System.Text.Json;
 
 namespace LLMAPI.Controllers
 {
+    /// <summary>
+    /// API controller for interacting with the Replicate service to run machine learning models.
+    /// This controller allows running models hosted on Replicate by sending image and text prompts.
+    /// </summary>
     [ApiController]
     [Route("api/replicate")]
     public class ReplicateController : ControllerBase
@@ -18,6 +22,12 @@ namespace LLMAPI.Controllers
         private readonly IConfiguration _configuration;
         private readonly ILogger<ReplicateController> _logger;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReplicateController"/> class.
+        /// </summary>
+        /// <param name="replicateService">Service for interacting with the Replicate API.</param>
+        /// <param name="configuration">Application configuration for accessing settings like Replicate API key.</param>
+        /// <param name="logger">Logger for logging controller actions and errors.</param>
         public ReplicateController(IReplicateService replicateService, IConfiguration configuration, ILogger<ReplicateController> logger)
         {
             _replicateService = replicateService;
@@ -25,7 +35,19 @@ namespace LLMAPI.Controllers
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        /// <summary>
+        /// Runs a specified machine learning model on Replicate with provided image and prompt.
+        /// This endpoint creates a prediction on Replicate and polls for its result.
+        /// </summary>
+        /// <param name="input">A <see cref="ReplicateRequest"/> object containing the image URL and optional prompt for the model.</param>
+        /// <returns>IActionResult containing the final output from the Replicate model in the 'finalOutput' property. Returns BadRequest if input is null, or StatusCode 500 for internal server errors or Replicate API failures.</returns>
+        /// <response code="200">Returns the output from the Replicate model.</response>
+        /// <response code="400">Returns if the input request is null or invalid.</response>
+        /// <response code="500">Returns if there is an internal server error or an error communicating with the Replicate API.</response>
         [HttpPost("RunModel")]
+        [ProducesResponseType(typeof(object), 200)]
+        [ProducesResponseType(typeof(string), 400)]
+        [ProducesResponseType(typeof(string), 500)]
         public async Task<IActionResult> RunModel([FromBody] ReplicateRequest input)
         {
             if (input == null)
@@ -69,7 +91,12 @@ namespace LLMAPI.Controllers
             }
         }
 
-
+        /// <summary>
+        /// Polls the Replicate API for the result of a prediction until it is completed, failed, or an error occurs.
+        /// </summary>
+        /// <param name="predictionId">The ID of the prediction to poll for.</param>
+        /// <returns>A string representing the final output of the prediction if successful.</returns>
+        /// <exception cref="Exception">Thrown if the prediction fails, times out, or encounters an unexpected status or response structure.</exception>
         private async Task<string> PollForPredictionResult(string predictionId)
         {
             while (true)
@@ -132,6 +159,5 @@ namespace LLMAPI.Controllers
                 }
             }
         }
-
     }
 }
