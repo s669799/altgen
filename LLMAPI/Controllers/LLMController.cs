@@ -74,8 +74,7 @@ namespace LLMAPI.Controllers
                 string modelString = EnumHelper.GetEnumMemberValue(model);
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
-                    // Use default prompt if user didn't provide one
-                    string imagePrompt = string.IsNullOrWhiteSpace(prompt) ? DefaultAltTextPrompt : prompt;
+                    string imagePrompt = string.IsNullOrWhiteSpace(prompt) ? DefaultAltTextPrompt : DefaultAltTextPrompt + prompt;
                     responseContent = await _imageRecognitionService.AnalyzeImage(modelString, imageUrl, imagePrompt);
                 }
                 else if (!string.IsNullOrWhiteSpace(prompt))
