@@ -71,7 +71,14 @@ namespace ImageAnalysisConsole
                 ModelType.Claude3_5Sonnet,
                 ModelType.Claude3Haiku,
                 ModelType.Qwen2_5Vl72bInstruct,
-                ModelType.Qwen2_5Vl7bInstruct
+                ModelType.Qwen2_5Vl7bInstruct,
+                ModelType.MistralPixtralLarge,
+                ModelType.MistralPixtral12b,
+                ModelType.AmazonNovaLiteV1,
+                ModelType.Grok2Vision1212,
+                ModelType.Llama3_2_90bVisionInstruct,
+                ModelType.Llama3_2_11bVisionInstruct,
+                ModelType.MicrosoftPhi4MultimodalInstruct
             };
 
             string baseResultsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../..", "Results");

@@ -33,6 +33,12 @@ namespace LLMAPI.Enums
         Gemini2_5FlashLite,
 
         /// <summary>
+        /// Google's Gemini 2.5 Pro Experimental (Free) model (version 03-25).
+        /// </summary>
+        [EnumMember(Value = "google/gemini-2.5-pro-exp-03-25:free")]
+        Gemini2_5ProExpFree,
+
+        /// <summary>
         /// Anthropic's Claude 3.5 Sonnet model.
         /// </summary>
         [EnumMember(Value = "anthropic/claude-3.5-sonnet")]
@@ -56,11 +62,11 @@ namespace LLMAPI.Enums
         [EnumMember(Value = "meta-llama/llama-3.2-11b-vision-instruct")]
         Llama3_2_11bVisionInstruct,
 
-        /// <summary>
-        /// DeepSeek R1 Free model.
-        /// </summary>
-        [EnumMember(Value = "deepseek/deepseek-r1:free")]
-        DeepSeekR1,
+        ///// <summary>
+        ///// DeepSeek R1 Free model.
+        ///// </summary>
+        //[EnumMember(Value = "deepseek/deepseek-r1:free")]
+        //DeepSeekR1,
 
         /// <summary>
         /// Mistral Pixtral Large 2411 model.
@@ -92,22 +98,28 @@ namespace LLMAPI.Enums
         [EnumMember(Value = "amazon/nova-lite-v1")]
         AmazonNovaLiteV1,
 
-        /// <summary>
-        /// Fireworks FireLlava 13B model.
-        /// </summary>
-        [EnumMember(Value = "fireworks/firellava-13b")]
-        FireworksFireLlava13b,
+        ///// <summary>
+        ///// Fireworks FireLlava 13B model.
+        ///// </summary>
+        //[EnumMember(Value = "fireworks/firellava-13b")]
+        //FireworksFireLlava13b,
 
-        /// <summary>
-        /// Liuhaotian Llava 34B model.
-        /// </summary>
-        [EnumMember(Value = "liuhaotian/llava-yi-34b")]
-        liuhaotianLlava34b,
+        ///// <summary>
+        ///// Liuhaotian Llava 34B model.
+        ///// </summary>
+        //[EnumMember(Value = "liuhaotian/llava-yi-34b")]
+        //liuhaotianLlava34b,
 
         /// <summary>
         /// Grok 2 Vision 1212 model by x-AI.
         /// </summary>
         [EnumMember(Value = "x-ai/grok-2-vision-1212")]
-        Grok2Vision1212
+        Grok2Vision1212,
+
+        /// <summary>
+        /// Microsoft's Phi-4 Multimodal Instruct model.
+        /// </summary>
+        [EnumMember(Value = "microsoft/phi-4-multimodal-instruct")]
+        MicrosoftPhi4MultimodalInstruct
     }
 }
