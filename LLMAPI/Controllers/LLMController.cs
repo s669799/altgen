@@ -24,7 +24,9 @@ namespace LLMAPI.Controllers
         /// Default prompt used for image analysis when no specific prompt is provided in the request.
         /// This prompt is designed to generate accessible and informative alt text descriptions for images, following web accessibility best practices.
         /// </summary>
-        private const string DefaultAltTextPrompt = "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar.";
+        private const string DefaultAltTextPrompt1 = "Write an alt text for this image.";
+        private const string DefaultAltTextPrompt2 = "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar.";
+
 
         /// <summary>
         /// Initializes a new instance of the <see cref="LLMController"/> class.
@@ -74,7 +76,7 @@ namespace LLMAPI.Controllers
                 string modelString = EnumHelper.GetEnumMemberValue(model);
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
-                    string imagePrompt = string.IsNullOrWhiteSpace(prompt) ? DefaultAltTextPrompt : DefaultAltTextPrompt + prompt;
+                    string imagePrompt = string.IsNullOrWhiteSpace(prompt) ? DefaultAltTextPrompt1 : DefaultAltTextPrompt1 + prompt;
                     responseContent = await _imageRecognitionService.AnalyzeImage(modelString, imageUrl, imagePrompt);
                 }
                 else if (!string.IsNullOrWhiteSpace(prompt))
@@ -119,7 +121,7 @@ namespace LLMAPI.Controllers
                 if (!string.IsNullOrWhiteSpace(request.ImageUrl))
                 {
                     // Use default prompt if not provided
-                    string imagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt : request.Prompt;
+                    string imagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt1 : request.Prompt;
                     responseContent = await _imageRecognitionService.AnalyzeImage(modelString, request.ImageUrl, imagePrompt);
                 }
                 else

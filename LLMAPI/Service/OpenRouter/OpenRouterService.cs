@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Google.Protobuf;
 using Microsoft.Extensions.Configuration;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace LLMAPI.Services.OpenRouter
 {
@@ -67,6 +68,10 @@ namespace LLMAPI.Services.OpenRouter
                 model,
                 messages = new List<object>
                 {
+                    new {
+                        role = "system",
+                        content = "You are an alt text generator."
+                    },
                     new {
                         role = "user",
                         content = new List<object>
