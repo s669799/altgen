@@ -49,9 +49,10 @@ namespace LLMAPI.Controllers
         /// Processes a LLM request using query parameters to specify the model, prompt, and/or image URL.
         /// At least a prompt or an image URL must be provided.
         /// </summary>
-        /// <param name="model">The LLM model to use for processing the request. This is selected via a dropdown in Swagger UI.</param>
         /// <param name="prompt">Optional text prompt to send to the LLM for text generation or to guide image analysis. If not provided for image analysis, a default alt text prompt will be used.</param>
         /// <param name="imageUrl">Optional URL of an image to be analyzed by the LLM. If provided, the LLM will perform image recognition and analysis.</param>
+        /// <param name="model">The LLM model to use for processing the request. This is selected via a dropdown in Swagger UI.</param>
+        /// <param name="temperature">This setting influences the variety in the model’s responses. Lower values lead to more predictable and typical responses, while higher values encourage more diverse and less common responses. At 0, the model always gives the same response for a given input.</param>
         /// <returns>IActionResult containing the LLM's response in the `Response` property. Returns BadRequest if no prompt or imageUrl is provided, or StatusCode 500 for internal server errors.</returns>
         /// <response code="200">Returns the LLM response successfully.</response>
         /// <response code="400">Returns if the request is invalid, e.g., no prompt or image URL provided.</response>
