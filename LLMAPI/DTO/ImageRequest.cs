@@ -25,5 +25,11 @@ namespace LLMAPI.DTO
         /// Gets or sets the image URL for image analysis (optional).
         /// </summary>
         public string? ImageUrl { get; set; }
+
+        /// <summary>
+        /// Gets or sets the temperature of the request [0.0, 2.0] (optional)
+        /// </summary>
+        [Range(0.0, 2.0, ErrorMessage = "Temperature must be between 0.0 and 2.0.")]
+        public double? Temperature { get; set; }
     }
 }

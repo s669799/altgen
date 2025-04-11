@@ -6,6 +6,7 @@ using LLMAPI.Service.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 namespace LLMAPI.Controllers
 {
@@ -60,11 +61,11 @@ namespace LLMAPI.Controllers
         [ProducesResponseType(typeof(string), 400)]
         [ProducesResponseType(typeof(string), 500)]
         public async Task<IActionResult> ProcessRequest(
-            [FromQuery] ModelType model,
             [FromQuery] string? prompt,
-            [FromQuery] string? imageUrl)
+            [FromQuery] string? imageUrl,
+            [FromQuery] ModelType model = ModelType.ChatGpt4o,
+            [FromQuery][Range(0.0, 2.0)] double temperature = 1.0)
         {
-            // Validate input: At least one of `prompt` or `imageUrl` must be provided
             if (string.IsNullOrWhiteSpace(prompt) && string.IsNullOrWhiteSpace(imageUrl))
             {
                 return BadRequest("Please provide at least a prompt or an image URL.");
@@ -76,8 +77,8 @@ namespace LLMAPI.Controllers
                 string modelString = EnumHelper.GetEnumMemberValue(model);
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
-                    string imagePrompt = string.IsNullOrWhiteSpace(prompt) ? DefaultAltTextPrompt1 : DefaultAltTextPrompt1 + prompt;
-                    responseContent = await _imageRecognitionService.AnalyzeImage(modelString, imageUrl, imagePrompt);
+                    string imagePrompt = string.IsNullOrWhiteSpace(prompt) ? DefaultAltTextPrompt2 : DefaultAltTextPrompt2 + prompt;
+                    responseContent = await _imageRecognitionService.AnalyzeImage(modelString, imageUrl, imagePrompt, temperature);
                 }
                 else if (!string.IsNullOrWhiteSpace(prompt))
                 {
@@ -107,7 +108,6 @@ namespace LLMAPI.Controllers
         [ProducesResponseType(typeof(string), 500)]
         public async Task<IActionResult> ProcessRequestBody([FromBody] ImageRequest request)
         {
-            // Validate input
             if (request == null || (string.IsNullOrWhiteSpace(request.Prompt) && string.IsNullOrWhiteSpace(request.ImageUrl)))
             {
                 return BadRequest("Please provide at least a prompt or an image URL.");
@@ -117,12 +117,12 @@ namespace LLMAPI.Controllers
             {
                 string responseContent;
                 string modelString = EnumHelper.GetEnumMemberValue(request.Model);
+                double temperature = request.Temperature ?? 1.0;
 
                 if (!string.IsNullOrWhiteSpace(request.ImageUrl))
                 {
-                    // Use default prompt if not provided
                     string imagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt1 : request.Prompt;
-                    responseContent = await _imageRecognitionService.AnalyzeImage(modelString, request.ImageUrl, imagePrompt);
+                    responseContent = await _imageRecognitionService.AnalyzeImage(modelString, request.ImageUrl, imagePrompt, temperature);
                 }
                 else
                 {

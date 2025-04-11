@@ -16,7 +16,7 @@ namespace LLMAPI.Services.Interfaces
         /// <param name="imageUrl">The image URL.</param>
         /// <param name="textPrompt">Optional text prompt to guide image analysis.</param>
         /// <returns>The image description returned by the model.</returns>
-        Task<string> AnalyzeImage(string model, string imageUrl, string textPrompt = null);
+        Task<string> AnalyzeImage(string model, string imageUrl, string textPrompt = null, double temperature = 1.0);
 
         /// <summary>
         /// Analyzes an image given its file content as ByteString.
@@ -24,8 +24,9 @@ namespace LLMAPI.Services.Interfaces
         /// <param name="model">The model identifier.</param>
         /// <param name="imageBytes">The image content in ByteString format.</param>
         /// <param name="textPrompt">Optional text prompt to guide image analysis.</param>
+        /// <param name="temp"> Optional temperature parameter [0, 2].</param>
         /// <returns>The image description returned by the model.</returns>
-        Task<string> AnalyzeImage(string model, ByteString imageBytes, string textPrompt = null);
+        Task<string> AnalyzeImage(string model, ByteString imageBytes, string textPrompt = null, double temperature = 1.0);
 
         ///// <summary>
         ///// Analyzes an image given its file content as ByteString.
