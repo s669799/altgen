@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
-using Google.Protobuf;
+using Google.Protobuf; // Ensure this using is present if using ByteString
 
 namespace LLMAPI.Services.Interfaces
 {
@@ -10,38 +10,40 @@ namespace LLMAPI.Services.Interfaces
     public interface IImageRecognitionService
     {
         /// <summary>
-        /// Analyzes an image given its URL.
+        /// Analyzes an image given its URL, potentially using context from a CNN prediction.
         /// </summary>
-        /// <param name="model">The model identifier.</param>
+        /// <param name="model">The model identifier (e.g., "openai/gpt-4o").</param>
         /// <param name="imageUrl">The image URL.</param>
-        /// <param name="textPrompt">Optional text prompt to guide image analysis.</param>
+        /// <param name="textPrompt">Base text prompt to guide image analysis.</param>
+        /// <param name="predictedAircraft">Optional predicted aircraft type from CNN.</param>
+        /// <param name="probability">Optional probability of the CNN prediction.</param>
+        /// <param name="temperature">Optional temperature parameter [0.0, 2.0].</param>
         /// <returns>The image description returned by the model.</returns>
-        Task<string> AnalyzeImage(string model, string imageUrl, string textPrompt = null, double temperature = 1.0);
+        Task<string> AnalyzeImage(
+            string model,
+            string imageUrl,
+            string textPrompt,
+            string? predictedAircraft,
+            double? probability,
+            double temperature = 1.0);
 
         /// <summary>
-        /// Analyzes an image given its file content as ByteString.
+        /// Analyzes an image given its file content as ByteString, potentially using context from a CNN prediction.
         /// </summary>
         /// <param name="model">The model identifier.</param>
         /// <param name="imageBytes">The image content in ByteString format.</param>
-        /// <param name="textPrompt">Optional text prompt to guide image analysis.</param>
-        /// <param name="temp"> Optional temperature parameter [0.0, 2.0].</param>
+        /// <param name="textPrompt">Base text prompt to guide image analysis.</param>
+        /// <param name="predictedAircraft">Optional predicted aircraft type from CNN.</param>
+        /// <param name="probability">Optional probability of the CNN prediction.</param>
+        /// <param name="temperature">Optional temperature parameter [0.0, 2.0].</param>
         /// <returns>The image description returned by the model.</returns>
-        Task<string> AnalyzeImage(string model, ByteString imageBytes, string textPrompt = null, double temperature = 1.0);
+        Task<string> AnalyzeImage(
+            string model,
+            ByteString imageBytes,
+            string textPrompt,
+            string? predictedAircraft,
+            double? probability,
+            double temperature = 1.0);
 
-        ///// <summary>
-        ///// Analyzes an image given its file content as ByteString.
-        ///// </summary>
-        ///// <param name="model">The model identifier.</param>
-        ///// <param name="imageBytes">The image content in ByteString format.</param>
-        ///// <returns>The image description returned by the model.</returns>
-        //Task<string> AnalyzeImage(string model, ByteString imageBytes);
-
-        ///// <summary>
-        ///// Analyzes an image by converting a URL to a base64-encoded string and using it in the payload.
-        ///// </summary>
-        ///// <param name="model">The model identifier.</param>
-        ///// <param name="imageUrl">The image URL.</param>
-        ///// <returns>The image description returned by the model.</returns>
-        //Task<string> AnalyzeImageBase64(string model, string imageUrl);
     }
 }
