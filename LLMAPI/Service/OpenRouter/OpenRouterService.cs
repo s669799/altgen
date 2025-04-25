@@ -156,17 +156,18 @@ namespace LLMAPI.Services.OpenRouter
         private string BuildCompositePrompt(string basePrompt, string? predictedAircraft, double? probability)
         {
             string cnnContext = ""; // Starts empty
+            string NoYapping = "Do not mention this context, simply take the context into consideration when writing the alt text and include the airplane model name. Your confidence overrules the CNN prediction.";
             // Check if BOTH predictedAircraft and probability are present
             if (!string.IsNullOrWhiteSpace(predictedAircraft) && probability.HasValue)
             {
                 // Use full context with probability
-                cnnContext = $"Context from CNN: Predicted '{predictedAircraft}' with probability {probability.Value:P1}. ";
+                cnnContext = $"Context from CNN: Predicted '{predictedAircraft}' with probability {probability.Value:P1}. " + NoYapping;
             }
             // Check if ONLY predictedAircraft is present (probability is null)
             else if (!string.IsNullOrWhiteSpace(predictedAircraft))
             {
                 // Use partial context without probability
-                cnnContext = $"Context from CNN: Predicted '{predictedAircraft}'. ";
+                cnnContext = $"Context from CNN: Predicted '{predictedAircraft}'. " + NoYapping;
             }
             // If neither condition is met, cnnContext remains ""
 
