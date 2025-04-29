@@ -6,7 +6,9 @@ using LLMAPI.Service.Interfaces;
 using LLMAPI.Services.Interfaces;
 using LLMAPI.Services.OpenRouter;
 using LLMAPI.Services.Google;
+using LLMAPI.Services.CnnPrediction;
 using LLMAPI.Service.Replicate;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +41,7 @@ builder.Services.AddScoped<ITextGenerationService>(sp => sp.GetRequiredService<O
 builder.Services.AddScoped<IGoogleService, GoogleImageRecognitionService>();
 builder.Services.AddScoped<IImageFileService, GoogleImageRecognitionService>();
 builder.Services.AddScoped<IReplicateService, ReplicateService>();
+builder.Services.AddScoped<ICnnPredictionService, FastAPICnnPredictionService>();
 
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";

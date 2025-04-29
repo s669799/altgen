@@ -6,12 +6,14 @@ using LLMAPI.Enums;
 namespace LLMAPI.DTO
 {
     /// <summary>
-    /// Represents a request for text generation or image analysis.
+    /// Represents a request for the general LLM endpoints (text or image analysis),
+    /// allowing optional inclusion of pre-calculated CNN predictions.
+    /// Used by LLMController.
     /// </summary>
-    public class ImageRequest
+    public class LLMRequest
     {
         /// <summary>
-        /// Gets or sets the model to use for processing.
+        /// Gets or sets the LLM model to use for processing. Defaults to ChatGpt4o.
         /// </summary>
         [Required]
         [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -24,25 +26,26 @@ namespace LLMAPI.DTO
 
         /// <summary>
         /// Gets or sets the image URL for image analysis (optional).
+        /// Must be provided if requesting image analysis.
         /// </summary>
         public string? ImageUrl { get; set; }
 
         /// <summary>
         /// Gets or sets the predicted aircraft type from a preceding CNN analysis (optional).
-        /// Populated from the `predicted_aircraft` field in the input JSON.
+        /// This field is intended to be provided BY THE CLIENT if they have already run the CNN.
         /// </summary>
-        [JsonPropertyName("predicted_aircraft")] // Maps from JSON key
+        [System.Text.Json.Serialization.JsonPropertyName("predicted_aircraft")]
         public string? PredictedAircraft { get; set; }
 
         /// <summary>
         /// Gets or sets the probability associated with the CNN prediction (optional).
-        /// Populated from the `probability` field in the input JSON.
+        /// This field is intended to be provided BY THE CLIENT if they have already run the CNN.
         /// </summary>
-        [JsonPropertyName("probability")] // Maps from JSON key
+        [System.Text.Json.Serialization.JsonPropertyName("probability")]
         public double? Probability { get; set; }
 
         /// <summary>
-        /// Gets or sets the temperature of the request [0.0, 2.0] (optional)
+        /// Gets or sets the temperature of the request [0.0, 2.0] (optional). Defaults to 1.0.
         /// </summary>
         [Range(0.0, 2.0, ErrorMessage = "Temperature must be between 0.0 and 2.0.")]
         [DefaultValue(1.0)]
