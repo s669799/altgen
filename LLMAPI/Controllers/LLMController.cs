@@ -60,7 +60,7 @@ namespace LLMAPI.Controllers
         public async Task<IActionResult> ProcessRequest(
             [FromQuery] string? prompt,
             [FromQuery] string? imageUrl,
-            [FromQuery] ModelType model = ModelType.ChatGpt4o, // Or your preferred default
+            [FromQuery] ModelType model = ModelType.ChatGpt4o,
             [FromQuery][Range(0.0, 2.0)] double temperature = 1.0)
         {
             if (string.IsNullOrWhiteSpace(prompt) && string.IsNullOrWhiteSpace(imageUrl))
@@ -75,14 +75,11 @@ namespace LLMAPI.Controllers
 
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
-                    // Combine prompt with default if needed, service layer doesn't add CNN context here
                     string imagePrompt = DefaultAltTextPrompt2 + (string.IsNullOrWhiteSpace(prompt) ? "" : " User instruction: " + prompt);
-                    // Call AnalyzeImage without CNN parameters for this endpoint
                     responseContent = await _imageRecognitionService.AnalyzeImage(modelString, imageUrl, imagePrompt, null, null, temperature);
                 }
                 else if (!string.IsNullOrWhiteSpace(prompt))
                 {
-                    // Text generation only
                     responseContent = await _textService.GenerateText(modelString, prompt);
                 }
 
@@ -90,7 +87,6 @@ namespace LLMAPI.Controllers
             }
             catch (Exception ex)
             {
-                // Log the exception details (using a proper logger is recommended)
                 Console.WriteLine($"Error in ProcessRequest: {ex}");
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
@@ -107,7 +103,6 @@ namespace LLMAPI.Controllers
         [ProducesResponseType(typeof(string), 500)]
         public async Task<IActionResult> ProcessRequestBody([FromBody] ImageRequest request)
         {
-            // Validate basic request structure
             if (request == null)
             {
                 return BadRequest("Request body cannot be null.");
@@ -116,7 +111,6 @@ namespace LLMAPI.Controllers
             {
                 return BadRequest("Please provide at least a prompt or an image URL in the request body.");
             }
-            // Validate model state (including Range attribute for Temperature)
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
@@ -127,29 +121,22 @@ namespace LLMAPI.Controllers
             {
                 string responseContent;
                 string modelString = EnumHelper.GetEnumMemberValue(request.Model);
-                // Use provided temperature or default to 1.0
                 double temperature = request.Temperature ?? 1.0;
 
                 if (!string.IsNullOrWhiteSpace(request.ImageUrl))
                 {
-                    // Determine the base prompt: User's prompt OR the default alt text prompt
-                    string baseImagePrompt = string.IsNullOrWhiteSpace(request.Prompt)
-                                              ? DefaultAltTextPrompt2
-                                              : request.Prompt;
+                    string baseImagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt2: request.Prompt;
 
-                    // Call the service, passing the base prompt and the CNN data.
-                    // The service layer will handle combining the base prompt with CNN context.
                     responseContent = await _imageRecognitionService.AnalyzeImage(
                         modelString,
                         request.ImageUrl,
                         baseImagePrompt,
-                        request.PredictedAircraft, // Pass predicted aircraft
-                        request.Probability,       // Pass probability
+                        request.PredictedAircraft,
+                        request.Probability,
                         temperature);
                 }
-                else // No ImageUrl, assume text generation only
+                else
                 {
-                    // Ensure prompt is not null here because of earlier check
                     responseContent = await _textService.GenerateText(modelString, request.Prompt!);
                 }
 
@@ -157,9 +144,7 @@ namespace LLMAPI.Controllers
             }
             catch (Exception ex)
             {
-                // Log the exception details (using a proper logger is recommended)
                 Console.WriteLine($"Error in ProcessRequestBody: {ex}");
-                // Optionally inspect request details here for debugging, but avoid logging sensitive data
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }

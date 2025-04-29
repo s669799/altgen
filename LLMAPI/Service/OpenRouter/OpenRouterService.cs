@@ -71,7 +71,6 @@ namespace LLMAPI.Services.OpenRouter
             double? probability,
             double temperature)
         {
-            // Gets the potentially augmented prompt - Now uses the actual parameters
             string compositePrompt = BuildCompositePrompt(textPrompt, predictedAircraft, probability);
 
             var requestData = new
@@ -85,9 +84,7 @@ namespace LLMAPI.Services.OpenRouter
                         role = "user",
                         content = new List<object>
                         {
-                            // Uses the combined prompt here
                             new { type = "text", text = compositePrompt },
-                            // Image URL alongside the text
                             new { type = "image_url", image_url = new { url = imageUrl } }
                         }
                     }
@@ -115,30 +112,23 @@ namespace LLMAPI.Services.OpenRouter
             double? probability,
             double temperature)
         {
-            // Construct the final prompt, prepending CNN info if available
             string compositePrompt = BuildCompositePrompt(textPrompt, predictedAircraft, probability);
 
             string base64Image = imageBytes.ToBase64();
-            // Ensure the correct MIME type if it might not always be PNG
-            string dataUri = $"data:image/png;base64,{base64Image}"; // Assuming PNG, adjust if needed
+            string dataUri = $"data:image/png;base64,{base64Image}";
 
             var requestData = new
             {
                 model,
                 temperature,
-                max_tokens = 500, // Consider making this configurable
+                max_tokens = 500,
                 messages = new List<object>
                 {
                     new {
                         role = "user",
                         content = new List<object>
                         {
-                             // Use the composite prompt which includes CNN context
                             new { type = "text", text = compositePrompt },
-                            // IMPORTANT: OpenRouter documentation usually expects image content via 'image_url'
-                            // even for base64 data URIs. Check their latest API spec.
-                            // If 'image_bytes' is a valid type, use that, otherwise use image_url with data URI.
-                            // Using image_url with data URI as it's more standard for vision models.
                             new { type = "image_url", image_url = new { url = dataUri } }
                             // If 'image_bytes' is supported:
                             // new { type = "image_bytes", image_bytes = base64Image } // Send only base64 part
@@ -155,23 +145,17 @@ namespace LLMAPI.Services.OpenRouter
         /// </summary>
         private string BuildCompositePrompt(string basePrompt, string? predictedAircraft, double? probability)
         {
-            string cnnContext = ""; // Starts empty
+            string cnnContext = "";
             string NoYapping = "Do not mention this context, simply take the context into consideration when writing the alt text and include the airplane model name. Your confidence overrules the CNN prediction.";
-            // Check if BOTH predictedAircraft and probability are present
+            
             if (!string.IsNullOrWhiteSpace(predictedAircraft) && probability.HasValue)
             {
-                // Use full context with probability
                 cnnContext = $"Context from CNN: Predicted '{predictedAircraft}' with probability {probability.Value:P1}. " + NoYapping;
             }
-            // Check if ONLY predictedAircraft is present (probability is null)
             else if (!string.IsNullOrWhiteSpace(predictedAircraft))
             {
-                // Use partial context without probability
                 cnnContext = $"Context from CNN: Predicted '{predictedAircraft}'. " + NoYapping;
             }
-            // If neither condition is met, cnnContext remains ""
-
-            // Prepend context (if any) to the base prompt
             return cnnContext + basePrompt;
         }
 
@@ -196,7 +180,7 @@ namespace LLMAPI.Services.OpenRouter
         private async Task<string> SendRequest(object requestData)
         {
             var openRouterAPIKey = _configuration["OpenRouter:APIKey"];
-            var openRouterAPIUrl = _configuration["OpenRouter:APIUrl"]; // Should be "https://openrouter.ai/api/v1/chat/completions"
+            var openRouterAPIUrl = _configuration["OpenRouter:APIUrl"];
 
             if (string.IsNullOrEmpty(openRouterAPIKey) || string.IsNullOrEmpty(openRouterAPIUrl))
             {
@@ -204,13 +188,12 @@ namespace LLMAPI.Services.OpenRouter
                 return "Error: Service configuration missing.";
             }
 
-            var client = _httpClientFactory.CreateClient("OpenRouterClient"); // Use a named client if configured
+            var client = _httpClientFactory.CreateClient("OpenRouterClient");
 
-            client.DefaultRequestHeaders.Clear(); // Clear headers for safety
+            client.DefaultRequestHeaders.Clear();
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {openRouterAPIKey}");
-            // Referer and Title might be optional depending on OpenRouter requirements for backend calls
-            client.DefaultRequestHeaders.Add("HTTP-Referer", _configuration["OpenRouter:Referer"] ?? "http://localhost"); // Make configurable
-            client.DefaultRequestHeaders.Add("X-Title", _configuration["OpenRouter:Title"] ?? "LLMAPI"); // Make configurable
+            client.DefaultRequestHeaders.Add("HTTP-Referer", _configuration["OpenRouter:Referer"] ?? "http://localhost");
+            client.DefaultRequestHeaders.Add("X-Title", _configuration["OpenRouter:Title"] ?? "LLMAPI");
 
             var jsonContent = JsonConvert.SerializeObject(requestData, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
             Console.WriteLine($">>> Sending JSON Request Body to {openRouterAPIUrl}: {jsonContent}");
@@ -227,7 +210,6 @@ namespace LLMAPI.Services.OpenRouter
                 if (response.IsSuccessStatusCode)
                 {
                     dynamic? jsonResponse = JsonConvert.DeserializeObject(responseContent);
-                    // Check specifically for OpenRouter's error structure if known, or a general 'error' field
                     if (jsonResponse?.error != null)
                     {
                         string errorMessage = $"OpenRouter API Error: {jsonResponse.error?.message ?? jsonResponse.error}";
@@ -235,7 +217,6 @@ namespace LLMAPI.Services.OpenRouter
                         return errorMessage;
                     }
 
-                    // Extract the content safely
                     var messageContent = jsonResponse?.choices?[0]?.message?.content;
                     if (messageContent != null)
                     {
@@ -247,7 +228,6 @@ namespace LLMAPI.Services.OpenRouter
                 }
                 else
                 {
-                    // Attempt to parse error details from OpenRouter's response if available
                     string errorDetails = responseContent;
                     try
                     {
@@ -257,7 +237,7 @@ namespace LLMAPI.Services.OpenRouter
                             errorDetails = errorJson.error.message;
                         }
                     }
-                    catch { /* Ignore if parsing fails, use raw content */ }
+                    catch {}
 
                     Console.WriteLine($"Error: {response.StatusCode}. Details: {errorDetails}");
                     return $"Error: {response.StatusCode}. Details: {errorDetails}";
@@ -283,7 +263,7 @@ namespace LLMAPI.Services.OpenRouter
         /// </summary>
         /// <param name="imageFile">The image file uploaded via HTTP.</param>
         /// <returns>The image content as a ByteString, or null if input is null.</returns>
-        public async Task<ByteString?> ConvertImageToByteString(IFormFile? imageFile) // Allow null input
+        public async Task<ByteString?> ConvertImageToByteString(IFormFile? imageFile)
         {
             if (imageFile == null || imageFile.Length == 0) return null;
 
@@ -297,7 +277,7 @@ namespace LLMAPI.Services.OpenRouter
         /// </summary>
         /// <param name="url">The URL of the image.</param>
         /// <returns>The image content as a ByteString, or null if reading fails.</returns>
-        public async Task<ByteString?> ReadImageFileAsync(string? url) // Allow null input
+        public async Task<ByteString?> ReadImageFileAsync(string? url)
         {
             if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out _))
             {
@@ -306,10 +286,9 @@ namespace LLMAPI.Services.OpenRouter
             }
             try
             {
-                // Use a dedicated client or one from the factory
                 using HttpClient client = _httpClientFactory.CreateClient();
                 using var response = await client.GetAsync(url);
-                response.EnsureSuccessStatusCode(); // Throw if download failed
+                response.EnsureSuccessStatusCode();
                 byte[] imageBytes = await response.Content.ReadAsByteArrayAsync();
                 return ByteString.CopyFrom(imageBytes);
             }
