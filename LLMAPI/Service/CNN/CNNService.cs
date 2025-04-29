@@ -12,13 +12,13 @@ using System.Threading.Tasks;
 namespace LLMAPI.Services.CnnPrediction
 {
     // Service implementation for interacting with the FastAPI CNN prediction endpoint.
-    public class FastAPICnnPredictionService : ICnnPredictionService
+    public class CNNPredictionService : ICnnPredictionService
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IConfiguration _configuration;
         private readonly string _cnnApiUrl;
 
-        public FastAPICnnPredictionService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        public CNNPredictionService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
             _httpClientFactory = httpClientFactory;
             _configuration = configuration;

@@ -41,7 +41,7 @@ builder.Services.AddScoped<ITextGenerationService>(sp => sp.GetRequiredService<O
 builder.Services.AddScoped<IGoogleService, GoogleImageRecognitionService>();
 builder.Services.AddScoped<IImageFileService, GoogleImageRecognitionService>();
 builder.Services.AddScoped<IReplicateService, ReplicateService>();
-builder.Services.AddScoped<ICnnPredictionService, FastAPICnnPredictionService>();
+builder.Services.AddScoped<ICnnPredictionService, CNNPredictionService>();
 
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
