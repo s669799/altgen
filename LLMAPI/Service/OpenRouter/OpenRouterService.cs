@@ -1,20 +1,23 @@
 // LLMAPI.Services/OpenRouter/OpenRouterService.cs
 using LLMAPI.DTO;
-using LLMAPI.Enums; // Although not directly used here, helpful for context/enums
-using LLMAPI.Helpers; // For EnumHelper/ByteString related helpers if needed
-using LLMAPI.Services.Interfaces; // Your main interfaces
-using LLMAPI.Service.Interfaces; // If this is a valid second namespace for interfaces, otherwise remove
-using Microsoft.AspNetCore.Http; // For IFormFile in IImageRecognitionService
-using Microsoft.Extensions.Configuration; // For configuration access
-using Newtonsoft.Json; // Assuming you use Newtonsoft.Json for serialization
+using LLMAPI.Enums;
+using LLMAPI.Helpers;
+using LLMAPI.Services.Interfaces;
+// using LLMAPI.Service.Interfaces; // Double check if this is needed or a typo
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json; // Use System.Text.Json
+using System.Text.Json.Serialization; // Use System.Text.Json.Serialization attributes
+using System.Text.Json.Nodes; // For JsonDocument parsing
 using System.Threading.Tasks;
-using Google.Protobuf; // For ByteString
-using System.Net.Http.Headers; // For setting Content-Type header
+using Google.Protobuf;
+using System.Net.Http.Headers;
+using LLMAPI.Service.Interfaces;
 
 namespace LLMAPI.Services.OpenRouter
 {
@@ -195,7 +198,7 @@ namespace LLMAPI.Services.OpenRouter
             // For simplicity, assuming png or jpg - adjust based on need and OpenRouter docs.
             // Determine actual MIME type if possible, otherwise default
             // string mimeType = ImageHelper.GetMimeType(imageBytes) ?? "image/jpeg"; // Example helper call
-            string mimeType = "image/jpeg"; // Default or placeholder
+            string mimeType = "image/jpg"; // Default or placeholder
             string dataUri = $"data:{mimeType};base64,{base64Image}";
 
 
@@ -227,23 +230,28 @@ namespace LLMAPI.Services.OpenRouter
         /// Helper method to build the composite prompt including optional CNN context.
         /// This method is used by both AnalyzeImage overloads.
         /// </summary>
-        // This looks good for incorporating the CNN data into the prompt string
         private string BuildCompositePrompt(string? basePrompt, string? predictedAircraft, double? probability)
         {
             string cnnContext = "";
-            string NoYapping = "Do not mention this context literally. Instead, integrate the airplane model name from the context directly into the alt text description if the provided probability is high or if your internal model is confident about that aircraft. Your confidence overrules the CNN prediction if there is a conflict. Do not state that your confidence overrules the prediction. Just act on it.";
+            string NoYapping = "State the confidence given to you by me";
 
             if (!string.IsNullOrWhiteSpace(predictedAircraft) && probability.HasValue)
             {
-                cnnContext = $"Preceding analysis context: Identified primary subject as '{predictedAircraft}' with probability {probability.Value:P1}. " + NoYapping;
+                cnnContext = $"Preceding analysis context: Identified primary subject as {predictedAircraft} with probability {probability.Value:P1}. ";
             }
             else if (!string.IsNullOrWhiteSpace(predictedAircraft))
             {
-                // If probability isn't provided (e.g., older CNN version, or client only provided type)
-                cnnContext = $"Preceding analysis context: Identified primary subject as '{predictedAircraft}'. " + NoYapping;
+                cnnContext = $"Preceding analysis context: Identified primary subject as {predictedAircraft}. ";
             }
-            // Combine the generated CNN context (if any) with the original/default prompt
-            return cnnContext + (string.IsNullOrWhiteSpace(basePrompt) ? "" : "\n" + basePrompt.Trim()); // Add user prompt on a new line if present
+
+            string compositePrompt = cnnContext + NoYapping;
+
+            if (!string.IsNullOrWhiteSpace(basePrompt) && !basePrompt.Equals("string", StringComparison.OrdinalIgnoreCase))
+            {
+                compositePrompt += ". " + basePrompt;
+            }
+
+            return compositePrompt;
         }
 
 
@@ -254,7 +262,7 @@ namespace LLMAPI.Services.OpenRouter
         /// </summary>
         /// <param name="requestData">The request data object to be serialized as JSON.</param>
         /// <returns>The content of the successful response from the API.</returns>
-        /// <exception cref="ConfigurationException">Thrown if API key or URL is missing.</exception>
+        /// <exception cref="ApplicationException">Thrown if API key or URL is missing.</exception>
         /// <exception cref="HttpRequestException">Thrown if the underlying HTTP request fails.</exception>
         /// <exception cref="JsonException">Thrown if deserialization fails.</exception>
         /// <exception cref="Exception">Thrown for API-specific errors indicated in the response body or unexpected response formats.</exception>
@@ -281,10 +289,21 @@ namespace LLMAPI.Services.OpenRouter
             client.DefaultRequestHeaders.Add("HTTP-Referer", openRouterReferer);
             client.DefaultRequestHeaders.Add("X-Title", openRouterTitle);
 
-            // Serialize request data
-            var jsonContent = JsonConvert.SerializeObject(requestData, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+            // Configure System.Text.Json options - Adjust as needed
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true, // Good default for robust deserialization (though we are parsing manually below)
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, // Omits null properties when serializing
+                // Add other options like converters if needed
+                WriteIndented = true // For pretty printing in console log (optional)
+            };
+
+
+            // Serialize request data using System.Text.Json
+            var jsonContent = System.Text.Json.JsonSerializer.Serialize(requestData, jsonOptions); // Pass options here
             // Production logging: _logger.LogInformation("Sending JSON Request Body to {OpenRouterAPIUrl}: {JsonContent}", openRouterAPIUrl, jsonContent);
-            Console.WriteLine($">>> Sending JSON Request Body to {openRouterAPIUrl}: {jsonContent}"); // Dev logging
+            Console.WriteLine($">>> Sending JSON Request Body to {openRouterAPIUrl}:\n{jsonContent}"); // Dev logging
+
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             try
@@ -297,46 +316,46 @@ namespace LLMAPI.Services.OpenRouter
                 Console.WriteLine($"<<< Status code: {response.StatusCode}");
                 Console.WriteLine($"<<< Raw API response: {responseContent}"); // Be cautious logging full responses in production
 
-                // Handle successful response statuses (usually 2xx)
+
                 if (response.IsSuccessStatusCode)
                 {
                     try
                     {
-                        // Attempt to deserialize the response
-                        dynamic? jsonResponse = JsonConvert.DeserializeObject(responseContent);
+                        // Deserialize the response using System.Text.Json to a type that matches the structure
+                        // Using JsonDocument for flexible parsing of the expected chat completion structure
+                        using var doc = JsonDocument.Parse(responseContent);
+                        var root = doc.RootElement;
 
                         // Check for API-specific errors within the success response body
-                        if (jsonResponse?.error != null)
+                        if (root.TryGetProperty("error", out var errorElement))
                         {
-                            string errorMessage = $"OpenRouter API Error in success response: {jsonResponse.error?.message ?? jsonResponse.error}";
-                            // Production logging: _logger.LogError(errorMessage);
-                            Console.WriteLine(errorMessage); // Dev logging
-                            throw new Exception(errorMessage); // Throw specific exception for API errors
+                            string errorMessage = errorElement.TryGetProperty("message", out var errorMessageElement) ? errorMessageElement.GetString() ?? errorElement.ToString() : errorElement.ToString();
+                            Console.WriteLine($"OpenRouter API Error in success response body: {errorMessage}");
+                            throw new Exception($"OpenRouter API Error in success response body: {errorMessage}");
                         }
 
-                        // Extract the generated content
-                        var messageContent = jsonResponse?.choices?[0]?.message?.content;
-                        if (messageContent != null)
+                        // Extract the generated content from choices -> [0] -> message -> content
+                        if (root.TryGetProperty("choices", out var choicesElement) &&
+                            choicesElement.EnumerateArray().FirstOrDefault() is JsonElement firstChoice &&
+                            firstChoice.TryGetProperty("message", out var messageElement) &&
+                            messageElement.TryGetProperty("content", out var contentElement))
                         {
-                            return messageContent.ToString(); // Return the content
+                            return contentElement.GetString() ?? ""; // Return the content string, default to empty if somehow null
                         }
 
-                        // Case: Success status but no expected content structure
-                        // Production logging: _logger.LogWarning("Successful response but no valid content found in choices[0].message.content for request: {@RequestData}", requestData);
-                        Console.WriteLine("Warning: Successful response but no valid content found in choices[0].message.content."); // Dev logging
+                        // Case: Success status but no expected content structure or API error
+                        Console.WriteLine("Warning: Successful response but no valid content found in expected format or API error structure.");
                         throw new Exception("Model returned a successful response, but no content was found in expected format.");
+
                     }
                     catch (JsonException jsonEx)
                     {
-                        // Handle JSON deserialization errors
-                        // Production logging: _logger.LogError(jsonEx, "Failed to deserialize OpenRouter API response: {ResponseContent}", responseContent);
-                        Console.WriteLine($"JSON Deserialization Error from OpenRouter: {jsonEx.Message}. Response: {responseContent}"); // Dev logging
+                        Console.WriteLine($"JSON Deserialization Error from OpenRouter (System.Text.Json): {jsonEx.Message}. Response: {responseContent}");
                         throw new Exception($"Failed to parse LLM service response: {jsonEx.Message}", jsonEx);
                     }
                     catch (Exception parseEx) when (parseEx is not HttpRequestException && parseEx is not JsonException)
                     {
                         // Handle other potential structured response parsing errors not covered by JsonException
-                        // Production logging: _logger.LogError(parseEx, "Unexpected error parsing OpenRouter API success response structure: {ResponseContent}", responseContent);
                         Console.WriteLine($"Unexpected error parsing OpenRouter API success response structure: {parseEx.Message}. Response: {responseContent}"); // Dev logging
                         throw new Exception($"Unexpected format in LLM service success response: {parseEx.Message}", parseEx);
                     }
@@ -344,31 +363,32 @@ namespace LLMAPI.Services.OpenRouter
                 // Handle non-success response statuses (e.g., 4xx, 5xx)
                 else
                 {
-                    // Attempt to extract error details from the response body
+                    // Attempt to extract error details from the response body using System.Text.Json
                     string errorDetails = responseContent;
                     try
                     {
-                        dynamic? errorJson = JsonConvert.DeserializeObject(responseContent);
-                        if (errorJson?.error?.message != null)
+                        using var errorDoc = JsonDocument.Parse(responseContent);
+                        var root = errorDoc.RootElement;
+                        if (root.TryGetProperty("error", out var errorElement))
                         {
-                            errorDetails = errorJson.error.message;
+                            // Attempt to get nested message, fallback to error object string itself
+                            errorDetails = errorElement.TryGetProperty("message", out var errorMessageElement) ? errorMessageElement.GetString() ?? errorElement.ToString() : errorElement.ToString();
                         }
                     }
                     catch (JsonException)
                     {
                         // Ignore JSON parsing error if the response isn't structured JSON
-                        // Production logging: _logger.LogWarning("Failed to parse error response as JSON from OpenRouter: {ResponseContent}", responseContent);
+                        Console.WriteLine("Warning: Failed to parse error response as JSON from OpenRouter.");
                     }
                     catch (Exception parseEx)
                     {
-                        // Production logging: _logger.LogWarning(parseEx, "Unexpected error parsing OpenRouter error response body: {ResponseContent}", responseContent);
+                        Console.WriteLine($"Unexpected error parsing OpenRouter error response body (System.Text.Json): {parseEx.Message}. Response: {responseContent}");
                     }
 
+
                     string errorMsg = $"OpenRouter API returned non-success status code {response.StatusCode}. Details: {errorDetails}";
-                    // Production logging: _logger.LogError(errorMsg);
-                    Console.WriteLine(errorMsg); // Dev logging
-                    // Throw HttpRequestException for non-success status codes, as per standard HttpClient behavior
-                    // You could also throw a custom exception if you prefer.
+                    Console.WriteLine(errorMsg);
+                    // Throw HttpRequestException for non-success status codes
                     response.EnsureSuccessStatusCode(); // This will throw HttpRequestException
                     return null!; // This line is unreachable because EnsureSuccessStatusCode throws
                 }
@@ -376,14 +396,12 @@ namespace LLMAPI.Services.OpenRouter
             catch (HttpRequestException httpEx)
             {
                 // Handle fundamental HTTP request errors (network issues, DNS failures, timeouts BEFORE getting a response, etc.)
-                // Production logging: _logger.LogError(httpEx, "HTTP Request Error sending to OpenRouter");
                 Console.WriteLine($"HTTP Request Error sending to OpenRouter: {httpEx.Message}"); // Dev logging
                 throw; // Re-throw the exception after logging
             }
             catch (Exception ex)
             {
                 // Catch any other unexpected errors during the process
-                // Production logging: _logger.LogError(ex, "An unexpected error occurred during OpenRouter request execution");
                 Console.WriteLine($"An unexpected error occurred during OpenRouter request: {ex}"); // Dev logging
                 throw new Exception("An unexpected error occurred during the LLM service request.", ex); // Wrap and re-throw
             }
@@ -422,44 +440,34 @@ namespace LLMAPI.Services.OpenRouter
         /// <exception cref="UriFormatException">Thrown if the URL is not a valid absolute URI.</exception>
         /// <exception cref="HttpRequestException">Thrown if the HTTP request to download the image fails.</exception>
         /// <exception cref="Exception">Thrown for other unexpected errors during download/read.</exception>
-        public async Task<ByteString> ReadImageFileAsync(string url) // Changed return to ByteString (non-nullable) and added exceptions
+        public async Task<ByteString> ReadImageFileAsync(string url)
         {
             if (string.IsNullOrWhiteSpace(url))
             {
-                // _logger.LogError("ReadImageFileAsync called with null or empty URL.");
-                Console.WriteLine("Error: ReadImageFileAsync called with null or empty URL."); // Dev logging
+                Console.WriteLine("Error: ReadImageFileAsync called with null or empty URL.");
                 throw new ArgumentNullException(nameof(url), "Image URL cannot be null or empty.");
             }
             if (!Uri.TryCreate(url, UriKind.Absolute, out _))
             {
-                // _logger.LogError("ReadImageFileAsync called with invalid URL format: {Url}", url);
-                Console.WriteLine($"Invalid URL format provided: {url}"); // Dev logging
+                Console.WriteLine($"Invalid URL format provided: {url}");
                 throw new UriFormatException($"Invalid URL format provided: {url}");
             }
 
             try
             {
-                // Create client specifically for download if needed, or use default
                 using HttpClient client = _httpClientFactory.CreateClient();
-                // Add reasonable timeout for downloads
-                client.Timeout = TimeSpan.FromSeconds(30); // Example timeout, configure as needed
+                client.Timeout = TimeSpan.FromSeconds(30);
 
+                Console.WriteLine($"Attempting to download image from URL: {url}");
+                using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
 
-                Console.WriteLine($"Attempting to download image from URL: {url}"); // Dev Logging
-                // Use GetAsync for simple download, checking for success status
-                using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead); // Use ResponseHeadersRead for potential large files, then read bytes
-                response.EnsureSuccessStatusCode(); // Throws HttpRequestException for non-success codes
-
-                // Read the response content as byte array
                 byte[] imageBytes = await response.Content.ReadAsByteArrayAsync();
-                Console.WriteLine($"Successfully downloaded {imageBytes.Length} bytes from URL: {url}"); // Dev Logging
+                Console.WriteLine($"Successfully downloaded {imageBytes.Length} bytes from URL: {url}");
 
-                // Check if content is actually empty after success status - could happen with zero-byte files
                 if (imageBytes == null || imageBytes.Length == 0)
                 {
-                    // _logger.LogWarning("Downloaded content is empty for URL: {Url}", url);
-                    Console.WriteLine($"Warning: Downloaded content is empty for URL: {url}"); // Dev Logging
-                                                                                               // Decide how to handle empty download - throwing might be best for the workflow
+                    Console.WriteLine($"Warning: Downloaded content is empty for URL: {url}");
                     throw new Exception($"Downloaded image content is empty for URL: {url}");
                 }
 
@@ -467,25 +475,25 @@ namespace LLMAPI.Services.OpenRouter
             }
             catch (HttpRequestException httpEx)
             {
-                // Log HTTP errors during download
-                // Production logging: _logger.LogError(httpEx, "Failed to download image from URL: {Url}", url);
-                Console.WriteLine($"Failed to download image from URL '{url}'. Error: {httpEx.Message}"); // Dev logging
-                throw; // Re-throw the exception to be caught by the controller
+                Console.WriteLine($"Failed to download image from URL '{url}'. Error: {httpEx.Message}");
+                throw;
             }
             catch (TaskCanceledException timeoutEx) when (timeoutEx.InnerException is TimeoutException)
             {
-                // Handle timeout specifically if desired
-                // Production logging: _logger.LogError(timeoutEx, "Timeout downloading image from URL: {Url}", url);
-                Console.WriteLine($"Timeout downloading image from URL '{url}': {timeoutEx.Message}"); // Dev logging
-                throw new TimeoutException($"Timeout downloading image from URL: {url}", timeoutEx); // Throw a specific timeout exception
+                Console.WriteLine($"Timeout downloading image from URL '{url}': {timeoutEx.Message}");
+                throw new TimeoutException($"Timeout downloading image from URL: {url}", timeoutEx);
             }
             catch (Exception ex)
             {
-                // Catch any other unexpected errors during download/read
-                // Production logging: _logger.LogError(ex, "An error occurred while reading image from URL: {Url}", url);
-                Console.WriteLine($"An error occurred while reading image from URL '{url}'. Error: {ex.Message}"); // Dev logging
-                throw new Exception($"An error occurred while downloading/reading image from URL: {url}", ex); // Wrap and re-throw
+                Console.WriteLine($"An error occurred while reading image from URL '{url}'. Error: {ex.Message}");
+                throw new Exception($"An error occurred while downloading/reading image from URL: {url}", ex);
             }
+
+            // Add this line to satisfy the compiler that something is always returned or thrown
+            // Given the catch-all Exception, this should theoretically never be reached,
+            // but it satisfies the code path analysis.
+            throw new InvalidOperationException("Unexpected code path reached in ReadImageFileAsync.");
         }
+
     }
 }
