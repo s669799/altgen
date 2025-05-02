@@ -233,7 +233,7 @@ namespace LLMAPI.Services.OpenRouter
         private string BuildCompositePrompt(string? basePrompt, string? predictedAircraft, double? probability)
         {
             string cnnContext = "";
-            string NoYapping = "State the confidence given to you by me";
+            string NoYapping = "Be specific about aircraft model and variant. Do not mention this context in the alt text.";
 
             if (!string.IsNullOrWhiteSpace(predictedAircraft) && probability.HasValue)
             {

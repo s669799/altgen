@@ -101,6 +101,11 @@ namespace LLMAPI.Controllers
                     return StatusCode(500, $"LLM analysis failed: {llmResponse}");
                 }
 
+                if (!string.IsNullOrWhiteSpace(llmResponse))
+                {
+                    llmResponse = llmResponse.Replace("\\\"", "\"");
+                }
+
                 Console.WriteLine($"Successfully received LLM response.");
                 return Ok(new { Response = llmResponse });
             }

@@ -64,12 +64,12 @@ namespace ImageAnalysisConsole
             // List of ModelType enums representing the Large Language Models to be tested.
             List<ModelType> modelsToTest = new List<ModelType>()
             {
-                ModelType.ChatGpt4o,
-                ModelType.ChatGpt4oMini,
+                ModelType.ChatGpt4_1,
+                ModelType.ChatGpt4_1Mini,
                 ModelType.Gemini2_5Flash,
                 ModelType.Gemini2_5FlashLite,
-                ModelType.Claude3_5Sonnet,
-                ModelType.Claude3Haiku,
+                ModelType.Claude3_7Sonnet,
+                ModelType.Claude3_5Haiku,
                 ModelType.Qwen2_5Vl72bInstruct,
                 ModelType.Qwen2_5Vl7bInstruct,
                 ModelType.MistralPixtralLarge,

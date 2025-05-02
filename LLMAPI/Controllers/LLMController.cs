@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
 using Google.Api.Gax.Grpc;
 using LLMAPI.Service.Interfaces;
+using System.Linq; // Added for logging ModelState errors
 
 namespace LLMAPI.Controllers
 {
@@ -39,11 +40,12 @@ namespace LLMAPI.Controllers
         public async Task<IActionResult> ProcessRequest(
             [FromQuery] string? prompt,
             [FromQuery] string? imageUrl,
-            [FromQuery] ModelType model = ModelType.ChatGpt4o,
+            [FromQuery] ModelType model = ModelType.ChatGpt4_1,
             [FromQuery][Range(0.0, 2.0)] double temperature = 1.0)
         {
             if (string.IsNullOrWhiteSpace(prompt) && string.IsNullOrWhiteSpace(imageUrl))
             {
+                Console.WriteLine("Error: Neither prompt nor imageUrl provided in query.");
                 return BadRequest("Please provide at least a prompt or an image URL.");
             }
 
@@ -52,14 +54,29 @@ namespace LLMAPI.Controllers
                 string responseContent = string.Empty;
                 string modelString = EnumHelper.GetEnumMemberValue(model);
 
-                if (!string.IsNullOrWhiteSpace(imageUrl))
+                if (!string.IsNullOrWhiteSpace(imageUrl) && !imageUrl.Equals("string", StringComparison.OrdinalIgnoreCase)) // <<< Changed/Added
                 {
-                    string imagePrompt = DefaultAltTextPrompt2 + (string.IsNullOrWhiteSpace(prompt) ? "" : " User instruction: " + prompt);
-                    responseContent = await _imageRecognitionService.AnalyzeImage(modelString, imageUrl, imagePrompt, null, null, temperature);
+                    string combinedPrompt = DefaultAltTextPrompt2; // <<< Changed/Added
+                    if (!string.IsNullOrWhiteSpace(prompt) && !prompt.Equals("string", StringComparison.OrdinalIgnoreCase)) // <<< Changed/Added
+                    {
+                        combinedPrompt += ". " + prompt; // <<< Changed/Added
+                    }
+
+                    responseContent = await _imageRecognitionService.AnalyzeImage(modelString, imageUrl, combinedPrompt, null, null, temperature); // <<< Changed (used combinedPrompt)
                 }
-                else if (!string.IsNullOrWhiteSpace(prompt))
+                else if (!string.IsNullOrWhiteSpace(prompt)) // <<< Changed (added check for prompt validity)
                 {
                     responseContent = await _textService.GenerateText(modelString, prompt);
+                }
+                else // <<< Added failsafe for unexpected state
+                {
+                    Console.WriteLine("Error: Unexpected state where neither ImageUrl nor Prompt is valid after initial query checks.");
+                    return BadRequest("Internal logic error: Neither prompt nor image URL is valid.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(responseContent))
+                {
+                    responseContent = responseContent.Replace("\\\"", "\"");
                 }
 
                 return Ok(new { Response = responseContent });
@@ -79,14 +96,17 @@ namespace LLMAPI.Controllers
         {
             if (request == null)
             {
+                Console.WriteLine("Error: Request body is null.");
                 return BadRequest("Request body cannot be null.");
             }
             if (string.IsNullOrWhiteSpace(request.Prompt) && string.IsNullOrWhiteSpace(request.ImageUrl))
             {
+                Console.WriteLine("Error: Neither Prompt nor ImageUrl provided in request body.");
                 return BadRequest("Please provide at least a prompt or an image URL in the request body.");
             }
             if (!ModelState.IsValid)
             {
+                Console.WriteLine($"Error: ModelState is invalid: {string.Join(", ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage))}");
                 return BadRequest(ModelState);
             }
 
@@ -96,21 +116,45 @@ namespace LLMAPI.Controllers
                 string modelString = EnumHelper.GetEnumMemberValue(request.Model);
                 double temperature = request.Temperature ?? 1.0;
 
-                if (!string.IsNullOrWhiteSpace(request.ImageUrl))
-                {
-                    string baseImagePrompt = string.IsNullOrWhiteSpace(request.Prompt) ? DefaultAltTextPrompt2 : request.Prompt;
+                // --- Refined Prompt Logic for ProcessRequestBody ---
+                string finalPromptForLLM; // <<< Added
 
+                if (!string.IsNullOrWhiteSpace(request.ImageUrl) && !request.ImageUrl.Equals("string", StringComparison.OrdinalIgnoreCase)) // <<< Changed/Added
+                {
+                    // Image URL is provided, we use the DefaultAltTextPrompt2 as the base
+                    finalPromptForLLM = DefaultAltTextPrompt2; // <<< Changed/Added
+
+                    // Append the user's prompt if it exists and is not the literal "string"
+                    if (!string.IsNullOrWhiteSpace(request.Prompt) && !request.Prompt.Equals("string", StringComparison.OrdinalIgnoreCase)) // <<< Changed/Added
+                    {
+                        finalPromptForLLM += ". " + request.Prompt; // <<< Changed/Added
+                    }
+
+                    // Call AnalyzeImage using the constructed finalPromptForLLM
                     responseContent = await _imageRecognitionService.AnalyzeImage(
                         modelString,
                         request.ImageUrl,
-                        baseImagePrompt,
+                        finalPromptForLLM, // <<< Changed (used finalPromptForLLM)
                         request.PredictedAircraft,
                         request.Probability,
                         temperature);
                 }
-                else
+                else if (!string.IsNullOrWhiteSpace(request.Prompt)) // <<< Changed (added check for prompt validity)
                 {
-                    responseContent = await _textService.GenerateText(modelString, request.Prompt!);
+                    // No valid image URL, so this is just a text generation request
+                    // Use the user's prompt directly
+                    finalPromptForLLM = request.Prompt; // <<< Changed/Added
+                    responseContent = await _textService.GenerateText(modelString, finalPromptForLLM); // <<< Changed (used finalPromptForLLM)
+                }
+                else // <<< Added failsafe for unexpected state
+                {
+                    Console.WriteLine("Error: Unexpected state where neither ImageUrl nor Prompt is valid after initial body checks.");
+                    return BadRequest("Internal logic error: Neither prompt nor image URL is valid.");
+                }
+                // --- End Refined Prompt Logic ---
+                if (!string.IsNullOrWhiteSpace(responseContent))
+                {
+                    responseContent = responseContent.Replace("\\\"", "\"");
                 }
 
                 return Ok(new { Response = responseContent });

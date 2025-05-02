@@ -9,16 +9,22 @@ namespace LLMAPI.Enums
     public enum ModelType
     {
         /// <summary>
-        /// OpenAI's GPT-4o model.
+        /// OpenAI's GPT-4.1 model.
         /// </summary>
-        [EnumMember(Value = "openai/gpt-4o")]
-        ChatGpt4o,
+        [EnumMember(Value = "openai/gpt-4.1")]
+        ChatGpt4_1,
 
         /// <summary>
         /// OpenAI's GPT-4o-mini model.
         /// </summary>
-        [EnumMember(Value = "openai/gpt-4o-mini")]
-        ChatGpt4oMini,
+        [EnumMember(Value = "openai/gpt-4.1-mini")]
+        ChatGpt4_1Mini,
+
+        /// <summary>
+        /// OpenAI's GPT-4o-mini model.
+        /// </summary>
+        [EnumMember(Value = "openai/gpt-4.1-nano")]
+        ChatGpt4_1Nano,
 
         /// <summary>
         /// Google's Gemini 2.0 Flash model.
@@ -33,22 +39,22 @@ namespace LLMAPI.Enums
         Gemini2_5FlashLite,
 
         /// <summary>
-        /// Google's Gemini 2.5 Pro Experimental (Free) model (version 03-25).
+        /// Google's Gemini 2.5 Flash Preview) model.
         /// </summary>
-        [EnumMember(Value = "google/gemini-2.5-pro-exp-03-25:free")]
-        Gemini2_5ProExpFree,
+        [EnumMember(Value = "google/gemini-2.5-flash-preview")]
+        Gemini2_5FlashPreview,
 
         /// <summary>
-        /// Anthropic's Claude 3.5 Sonnet model.
+        /// Anthropic's Claude 3.7 Sonnet model.
         /// </summary>
-        [EnumMember(Value = "anthropic/claude-3.5-sonnet")]
-        Claude3_5Sonnet,
+        [EnumMember(Value = "anthropic/claude-3.7-sonnet")]
+        Claude3_7Sonnet,
 
         /// <summary>
-        /// Anthropic's Claude 3 Haiku model.
+        /// Anthropic's Claude 3.5 Haiku model.
         /// </summary>
-        [EnumMember(Value = "anthropic/claude-3-haiku")]
-        Claude3Haiku,
+        [EnumMember(Value = "anthropic/claude-3.5-haiku")]
+        Claude3_5Haiku,
 
         /// <summary>
         /// Meta Llama 3.2 90B Vision Instruct model.
@@ -73,6 +79,12 @@ namespace LLMAPI.Enums
         /// </summary>
         [EnumMember(Value = "mistralai/pixtral-large-2411")]
         MistralPixtralLarge,
+
+        /// <summary>
+        /// Mistral Pixtral 24B model.
+        /// </summary>
+        [EnumMember(Value = "mistralai/mistral-small-3.1-24b-instruct")]
+        MistralPixtral24b,
 
         /// <summary>
         /// Mistral Pixtral 12B model.
