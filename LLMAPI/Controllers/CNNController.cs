@@ -37,7 +37,7 @@ namespace LLMAPI.Controllers
         // Endpoint: POST /api/cnn-llm/predict-and-analyze
         [DisableRequestSizeLimit] // Allows potentially large image downloads
         [RequestFormLimits(MultipartBodyLengthLimit = 209715200)] // Example limit
-        [HttpPost("predict-and-analyze")] // Clearer endpoint name
+        [HttpPost("predict")] // Clearer endpoint name
         [ProducesResponseType(typeof(object), 200)] // Success response structure
         [ProducesResponseType(typeof(string), 400)] // Bad Request response
         [ProducesResponseType(typeof(string), 500)] // Internal Server Error response
