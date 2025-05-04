@@ -2,107 +2,177 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using LLMAPI.Service.Interfaces;
+using LLMAPI.Services.Interfaces;
 using LLMAPI.DTO;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Text.Json;
+using Google.Protobuf;
+using System.Linq;
+using System.ComponentModel.DataAnnotations;
+
 
 namespace LLMAPI.Controllers
 {
-    /// <summary>
-    /// API controller for interacting with the Replicate service to run machine learning models.
-    /// This controller allows running models hosted on Replicate by sending image and text prompts.
-    /// </summary>
     [ApiController]
     [Route("api/replicate")]
     public class ReplicateController : ControllerBase
     {
         private readonly IReplicateService _replicateService;
+        private readonly IImageFileService _imageFileService;
+        private readonly ICnnPredictionService _cnnPredictionService;
         private readonly IConfiguration _configuration;
         private readonly ILogger<ReplicateController> _logger;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ReplicateController"/> class.
-        /// </summary>
-        /// <param name="replicateService">Service for interacting with the Replicate API.</param>
-        /// <param name="configuration">Application configuration for accessing settings like Replicate API key.</param>
-        /// <param name="logger">Logger for logging controller actions and errors.</param>
-        public ReplicateController(IReplicateService replicateService, IConfiguration configuration, ILogger<ReplicateController> logger)
+        public ReplicateController(
+            IReplicateService replicateService,
+            IImageFileService imageFileService,
+            ICnnPredictionService cnnPredictionService,
+            IConfiguration configuration,
+            ILogger<ReplicateController> logger)
         {
             _replicateService = replicateService;
+            _imageFileService = imageFileService;
+            _cnnPredictionService = cnnPredictionService;
             _configuration = configuration;
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        /// <summary>
-        /// Runs a specified machine learning model on Replicate with provided image and prompt.
-        /// This endpoint creates a prediction on Replicate and polls for its result.
-        /// </summary>
-        /// <param name="input">A <see cref="ReplicateRequest"/> object containing the image URL and optional prompt for the model.</param>
-        /// <returns>IActionResult containing the final output from the Replicate model in the 'finalOutput' property. Returns BadRequest if input is null, or StatusCode 500 for internal server errors or Replicate API failures.</returns>
-        /// <response code="200">Returns the output from the Replicate model.</response>
-        /// <response code="400">Returns if the input request is null or invalid.</response>
-        /// <response code="500">Returns if there is an internal server error or an error communicating with the Replicate API.</response>
         [HttpPost("RunModel")]
         [ProducesResponseType(typeof(object), 200)]
         [ProducesResponseType(typeof(string), 400)]
         [ProducesResponseType(typeof(string), 500)]
         public async Task<IActionResult> RunModel([FromBody] ReplicateRequest input)
         {
-            if (input == null)
+            if (input == null || string.IsNullOrWhiteSpace(input.Image))
             {
-                _logger.LogWarning("RunModel called with null input");
-                return BadRequest("Input cannot be null.");
+                _logger.LogWarning("RunModel called with null input or missing image URL.");
+                return BadRequest("Input or Image URL cannot be null.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
             }
 
             string modelVersion = "e5caf557dd9e5dcee46442e1315291ef1867f027991ede8ff95e304d4f734200";
 
-            // Hard-coded default prompt that includes the necessary token.
-            const string defaultPrompt = "Write a brief, one to two sentence alt text description for this <image>, Harvard style, that captures the main subjects, action, and setting. This is an alt text for an end user.";
+            const string basePrompt = "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar.";
 
-            // If the user supplies supplemental text, append it.
-            // Otherwise, only the default prompt will be used.
-            string finalPrompt = string.IsNullOrWhiteSpace(input.Prompt)
-                                 ? defaultPrompt
-                                 : $"{defaultPrompt} {input.Prompt}";
+            string fileName = new Uri(input.Image).Segments.LastOrDefault() ?? "image"; // Get filename early for potential use
+
+
+            string cnnContext = "";
+            string noYappingInstruction = "Be specific about model and variant of depicted object if applicable. Do not mention this context in the alt text.";
+
+            if (input.EnableCognitiveLayer ?? true) // If EnableCognitiveLayer is null, treat it as true
+            {
+                ByteString imageBytes;
+                try
+                {
+                    _logger.LogInformation("Cognitive Layer enabled. Downloading image from URL: {ImageUrl}", input.Image);
+                    imageBytes = await _imageFileService.ReadImageFileAsync(input.Image);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to download image for CNN from {ImageUrl}", input.Image);
+                    return StatusCode(500, $"Failed to download image for CNN: {ex.Message}");
+                }
+
+                CNNResponse cnnResponse;
+                try
+                {
+                    _logger.LogInformation("Sending image to CNN prediction service.");
+                    cnnResponse = await _cnnPredictionService.PredictAircraftAsync(imageBytes, fileName);
+
+                    if (!cnnResponse.Success)
+                    {
+                        _logger.LogError("CNN prediction failed. Details: {Detail}", cnnResponse.Detail);
+                        return StatusCode(500, $"CNN prediction failed: {cnnResponse.Detail}");
+                    }
+                    _logger.LogInformation("CNN prediction succeeded: {PredictedAircraft} ({Probability:P1})", cnnResponse.PredictedAircraft, cnnResponse.Probability);
+
+                    if (!string.IsNullOrWhiteSpace(cnnResponse.PredictedAircraft) && cnnResponse.Probability.HasValue)
+                    {
+                        cnnContext = $"Preceding analysis context: Identified primary subject as {cnnResponse.PredictedAircraft} with probability {cnnResponse.Probability.Value:P1}. ";
+                    }
+                    else if (!string.IsNullOrWhiteSpace(cnnResponse.PredictedAircraft))
+                    {
+                        cnnContext = $"Preceding analysis context: Identified primary subject as {cnnResponse.PredictedAircraft}. ";
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error during CNN prediction.");
+                    return StatusCode(500, $"Error during CNN prediction: {ex.Message}");
+                }
+            }
+            else
+            {
+                _logger.LogInformation("Cognitive Layer disabled. Skipping CNN prediction.");
+            }
+
+
+            // Build the composite prompt in the desired order: CONTEXT + NOYAPPING + (Base Prompt + User Prompt)
+            // CNN context will be empty if EnableCognitiveLayer was false
+            string compositePrompt = cnnContext;
+
+            // Add the no yapping instruction if CNN context was included OR if the base prompt is not just whitespace
+            // This prevents an empty prompt if no CNN context and no base prompt
+            if (!string.IsNullOrWhiteSpace(cnnContext) || !string.IsNullOrWhiteSpace(basePrompt) || !string.IsNullOrWhiteSpace(input.Prompt))
+            {
+                compositePrompt += noYappingInstruction;
+            }
+
+
+            compositePrompt += " " + basePrompt;
+
+            if (!string.IsNullOrWhiteSpace(input.Prompt) && !input.Prompt.Equals("string", StringComparison.OrdinalIgnoreCase))
+            {
+                // Add a separator only if the base prompt is not empty
+                if (!string.IsNullOrWhiteSpace(basePrompt))
+                {
+                    compositePrompt += ". " + input.Prompt;
+                }
+                else // If base prompt is empty, just append the user prompt
+                {
+                    compositePrompt += input.Prompt;
+                }
+            }
 
             var replicateInput = new Dictionary<string, object>
-    {
-        { "image", input.Image },
-        { "prompt", finalPrompt }
-    };
+            {
+                { "image", input.Image },
+                { "prompt", compositePrompt }, // <-- CORRECTED: Use the compositePrompt here
+                // Use the Temperature from the input DTO, defaulting to 1.0 as requested
+                { "temperature", input.Temperature ?? 1.0 }
+            };
 
             try
             {
-                _logger.LogInformation("Creating prediction for model version: {ModelVersion}", modelVersion);
+                _logger.LogInformation("Creating prediction on Replicate for model version: {ModelVersion}");
                 string predictionId = await _replicateService.CreatePrediction(modelVersion, replicateInput);
 
-                _logger.LogInformation("Polling for prediction result with ID: {PredictionId}", predictionId);
+                _logger.LogInformation("Polling for Replicate prediction result with ID: {PredictionId}", predictionId);
                 var finalOutput = await PollForPredictionResult(predictionId);
 
-                _logger.LogInformation("Prediction completed successfully with output.");
+                _logger.LogInformation("Replicate prediction completed successfully with output.");
                 return Ok(new { finalOutput });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error while running model.");
-                return StatusCode(500, $"Internal Server Error: {ex.Message}");
+                _logger.LogError(ex, "Error while running Replicate model.");
+                return StatusCode(500, $"Internal Server Error running Replicate model: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// Polls the Replicate API for the result of a prediction until it is completed, failed, or an error occurs.
-        /// </summary>
-        /// <param name="predictionId">The ID of the prediction to poll for.</param>
-        /// <returns>A string representing the final output of the prediction if successful.</returns>
-        /// <exception cref="Exception">Thrown if the prediction fails, times out, or encounters an unexpected status or response structure.</exception>
         private async Task<string> PollForPredictionResult(string predictionId)
         {
             while (true)
             {
-                // Log the start of the HTTP request for fetching prediction result.
-                _logger.LogInformation("Fetching prediction result for ID: {PredictionId}", predictionId);
+                _logger.LogInformation("Fetching Replicate prediction result for ID: {PredictionId}");
 
                 var result = await _replicateService.GetPredictionResult(predictionId);
 
@@ -110,51 +180,43 @@ namespace LLMAPI.Controllers
                 {
                     JsonElement root = document.RootElement;
 
-                    // Check if the status property exists
                     if (root.TryGetProperty("status", out JsonElement statusElement))
                     {
                         string status = statusElement.GetString();
 
-                        // Log the current status of the prediction
-                        _logger.LogInformation("Prediction status: {Status}", status);
+                        _logger.LogInformation("Replicate Prediction status: {Status}", status);
 
                         switch (status)
                         {
                             case "succeeded":
                                 if (root.TryGetProperty("output", out JsonElement outputElement))
                                 {
-                                    // Log successful completion
-                                    _logger.LogInformation("Prediction succeeded.");
+                                    _logger.LogInformation("Replicate Prediction succeeded.");
                                     return outputElement.GetRawText();
                                 }
-                                // Log error for missing output
-                                _logger.LogError("Prediction completed but no output was found.");
-                                throw new Exception("Prediction succeeded without output.");
+                                _logger.LogError("Replicate Prediction completed but no output was found.");
+                                throw new Exception("Replicate Prediction succeeded without output.");
 
                             case "starting":
                             case "processing":
-                                // Log that the prediction is still in progress
-                                _logger.LogInformation("Prediction in progress (status: {Status}). Waiting before retry.", status);
-                                await Task.Delay(2000);  // Adjust delay between checks as needed
+                                _logger.LogInformation("Replicate Prediction in progress (status: {Status}). Waiting before retry.", status);
+                                await Task.Delay(2000);
                                 break;
 
                             case "failed":
                                 var errorMessage = root.TryGetProperty("error", out var errorElement) ? errorElement.GetString() : "Unknown error.";
-                                // Log error message if prediction fails
-                                _logger.LogError("Prediction failed with message: {ErrorMessage}", errorMessage);
-                                throw new Exception($"Prediction failed: {errorMessage}");
+                                _logger.LogError("Replicate Prediction failed with message: {ErrorMessage}", errorMessage);
+                                throw new Exception($"Replicate Prediction failed: {errorMessage}");
 
                             default:
-                                // Log any unexpected status
-                                _logger.LogWarning("Encountered unexpected status: {Status}", status);
-                                break;
+                                _logger.LogWarning("Encountered unexpected Replicate status: {Status}", status);
+                                throw new Exception($"Replicate Prediction encountered unexpected status: {status}");
                         }
                     }
                     else
                     {
-                        // Log error if the response structure is missing expected properties
-                        _logger.LogError("Invalid response structure; status property missing.");
-                        throw new Exception("Response structure missing 'status' property.");
+                        _logger.LogError("Invalid Replicate response structure; status property missing.");
+                        throw new Exception("Replicate response structure missing 'status' property.");
                     }
                 }
             }

@@ -1,19 +1,21 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel;
+using System.Text.Json.Serialization;
 
 namespace LLMAPI.DTO
 {
-    /// <summary>
-    /// Represents a request to run a model on Replicate.
-    /// </summary>
     public class ReplicateRequest
     {
-        /// <summary>
-        /// Gets or sets the URL of the image to be processed by the Replicate model. This is a required input for image-based models.
-        /// </summary>
         public string Image { get; set; }
-        /// <summary>
-        /// Gets or sets an optional text prompt to guide the Replicate model. This can be used to provide additional context or instructions.
-        /// </summary>
         public string Prompt { get; set; }
+
+        [Range(0.0, 2.0, ErrorMessage = "Temperature must be between 0.0 and 2.0.")]
+        [DefaultValue(1.0)] // Replicate's default seems to be around 0.1 for this model
+        public double? Temperature { get; set; } = 1.0; // Set default value
+
+        // New property to control CNN layer
+        [JsonPropertyName("enable_cognitive_layer")] // Use snake_case for consistency
+        [DefaultValue(true)] // Default to true (CNN is on by default)
+        public bool? EnableCognitiveLayer { get; set; } = true; // Set default value
     }
 }

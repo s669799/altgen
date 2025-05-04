@@ -59,7 +59,7 @@ namespace LLMAPI.Service.Replicate
             if (!input.ContainsKey("top_p"))
                 input["top_p"] = 0.9;
             if (!input.ContainsKey("temperature"))
-                input["temperature"] = 0.1;
+                input["temperature"] = 1;
             if (!input.ContainsKey("max_length_tokens"))
                 input["max_length_tokens"] = 2048;
             if (!input.ContainsKey("repetition_penalty"))
