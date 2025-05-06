@@ -20,14 +20,12 @@ namespace LLMAPI.Helpers // Use a suitable namespace for helpers
         {
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                // Handle cases where no filename is provided gracefully
                 return "application/octet-stream";
             }
 
-            string mimeType = "application/octet-stream"; // Default
+            string mimeType = "application/octet-stream";
             string ext = Path.GetExtension(fileName).ToLowerInvariant();
 
-            // Handle extensions without a leading dot if necessary, though GetExtension should provide it
             if (!string.IsNullOrEmpty(ext) && ext[0] != '.')
             {
                 ext = "." + ext;
@@ -36,13 +34,10 @@ namespace LLMAPI.Helpers // Use a suitable namespace for helpers
 
             try
             {
-                // On Windows, try to get the MIME type from the Registry
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    // Use a try-catch around Registry access, as it might fail due to permissions or environment
                     try
                     {
-                        // OpenClassesRoot provides extension mappings
                         using (RegistryKey? regKey = Registry.ClassesRoot.OpenSubKey(ext))
                         {
                             if (regKey != null && regKey.GetValue("Content Type") != null)
@@ -55,15 +50,12 @@ namespace LLMAPI.Helpers // Use a suitable namespace for helpers
                             }
                         }
                     }
-                    catch (Exception ex) // Catch specific registry errors if needed, or just general catch
+                    catch (Exception ex)
                     {
-                        // Log this failure to use Registry, but don't let it stop the process
-                        // Using a logger here would be better than Console.Error if implemented
                         Console.Error.WriteLine($"Error accessing Windows Registry for MIME type for extension {ext}: {ex.Message}");
                     }
                 }
             }
-            // Catch any exception during the entire process if the internal try-catch missed something (less likely with the inner try)
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"An unexpected error occurred in MimeHelper for extension {ext}: {ex.Message}");
@@ -71,16 +63,14 @@ namespace LLMAPI.Helpers // Use a suitable namespace for helpers
             }
 
 
-            // Fallback to hardcoded list if Registry lookup failed or not on Windows
             switch (ext)
             {
                 case ".jpg": case ".jpeg": return "image/jpeg";
                 case ".png": return "image/png";
                 case ".gif": return "image/gif";
                 case ".webp": return "image/webp";
-                case ".pdf": return "application/pdf"; // Added PDF as common document type
-                // Add more types as needed
-                default: return "application/octet-stream"; // Default for unknown types
+                case ".pdf": return "application/pdf";
+                default: return "application/octet-stream";
             }
         }
     }

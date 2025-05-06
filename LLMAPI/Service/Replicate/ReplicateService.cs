@@ -7,13 +7,14 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using LLMAPI.Service.Interfaces;
+using LLMAPI.Service.Interfaces; // Assuming IReplicateService is here
 
 namespace LLMAPI.Service.Replicate
-{/// <summary>
- /// Implements the <see cref="IReplicateService"/> interface to interact with the Replicate API.
- /// Provides functionality to create predictions, retrieve prediction results, and test account access using the Replicate API.
- /// </summary>
+{
+    /// <summary>
+    /// Implements the <see cref="IReplicateService"/> interface to interact with the Replicate API.
+    /// Provides functionality to create predictions, retrieve prediction results, and test account access using the Replicate API.
+    /// </summary>
     public class ReplicateService : IReplicateService
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -55,7 +56,6 @@ namespace LLMAPI.Service.Replicate
                 throw new ArgumentException("Input dictionary cannot be null or empty.", nameof(input));
             }
 
-            // Add default parameters to ensure they are always present.
             if (!input.ContainsKey("top_p"))
                 input["top_p"] = 0.9;
             if (!input.ContainsKey("temperature"))
@@ -96,7 +96,7 @@ namespace LLMAPI.Service.Replicate
 
                         if (root.TryGetProperty("id", out var idElement))
                         {
-                            return idElement.GetString();
+                            return idElement.GetString()!;
                         }
 
                         _logger.LogError("Prediction ID not found in the response. Response may be malformed.");
@@ -147,7 +147,6 @@ namespace LLMAPI.Service.Replicate
 
                 if (response.IsSuccessStatusCode)
                 {
-                    // Return the response content directly.
                     return responseContent;
                 }
 

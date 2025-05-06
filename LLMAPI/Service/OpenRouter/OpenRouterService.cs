@@ -233,7 +233,7 @@ namespace LLMAPI.Services.OpenRouter
         private string BuildCompositePrompt(string? basePrompt, string? predictedAircraft, double? probability)
         {
             string cnnContext = "";
-            string NoYapping = "Be specific about aircraft model and variant. Do not mention this context in the alt text.";
+            string NoYapping = "Be specific about aircraft model and variant. Do not mention this context in the alt text. Your decision weighs more than CNN contex. If you are sure its something else, go for that.";
 
             if (!string.IsNullOrWhiteSpace(predictedAircraft) && probability.HasValue)
             {
@@ -268,65 +268,53 @@ namespace LLMAPI.Services.OpenRouter
         /// <exception cref="Exception">Thrown for API-specific errors indicated in the response body or unexpected response formats.</exception>
         private async Task<string> SendRequest(object requestData)
         {
-            // Get API key and URL from configuration
             var openRouterAPIKey = _configuration["OpenRouter:APIKey"];
             var openRouterAPIUrl = _configuration["OpenRouter:APIUrl"];
-            var openRouterReferer = _configuration["OpenRouter:Referer"] ?? "http://localhost"; // Default referer
-            var openRouterTitle = _configuration["OpenRouter:Title"] ?? "LLMAPI";       // Default title
+            var openRouterReferer = _configuration["OpenRouter:Referer"] ?? "http://localhost";
+            var openRouterTitle = _configuration["OpenRouter:Title"] ?? "LLMAPI";
 
             if (string.IsNullOrEmpty(openRouterAPIKey) || string.IsNullOrEmpty(openRouterAPIUrl))
             {
-                // Production logging: _logger.LogCritical("OpenRouter API Key or URL is not configured.");
-                Console.WriteLine("Error: OpenRouter API Key or URL is not configured."); // Dev logging
-                throw new ApplicationException("Service configuration missing for OpenRouter API."); // Throw specific exception
+                Console.WriteLine("Error: OpenRouter API Key or URL is not configured.");
+                throw new ApplicationException("Service configuration missing for OpenRouter API.");
             }
 
             var client = _httpClientFactory.CreateClient("OpenRouterClient");
 
-            // Configure client headers - Ensure clear works correctly if client factory reuses clients
             client.DefaultRequestHeaders.Clear();
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {openRouterAPIKey}");
             client.DefaultRequestHeaders.Add("HTTP-Referer", openRouterReferer);
             client.DefaultRequestHeaders.Add("X-Title", openRouterTitle);
 
-            // Configure System.Text.Json options - Adjust as needed
             var jsonOptions = new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true, // Good default for robust deserialization (though we are parsing manually below)
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, // Omits null properties when serializing
-                // Add other options like converters if needed
-                WriteIndented = true // For pretty printing in console log (optional)
+                PropertyNameCaseInsensitive = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                WriteIndented = true
             };
 
 
-            // Serialize request data using System.Text.Json
-            var jsonContent = System.Text.Json.JsonSerializer.Serialize(requestData, jsonOptions); // Pass options here
-            // Production logging: _logger.LogInformation("Sending JSON Request Body to {OpenRouterAPIUrl}: {JsonContent}", openRouterAPIUrl, jsonContent);
-            Console.WriteLine($">>> Sending JSON Request Body to {openRouterAPIUrl}:\n{jsonContent}"); // Dev logging
+            var jsonContent = System.Text.Json.JsonSerializer.Serialize(requestData, jsonOptions);
+            Console.WriteLine($">>> Sending JSON Request Body to {openRouterAPIUrl}:\n{jsonContent}");
 
             var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
             try
             {
-                // Send POST request
                 var response = await client.PostAsync(openRouterAPIUrl, content);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                // Production logging: _logger.LogInformation("Received OpenRouter API response: {StatusCode} - {ResponseContent}", response.StatusCode, responseContent);
                 Console.WriteLine($"<<< Status code: {response.StatusCode}");
-                Console.WriteLine($"<<< Raw API response: {responseContent}"); // Be cautious logging full responses in production
+                Console.WriteLine($"<<< Raw API response: {responseContent}");
 
 
                 if (response.IsSuccessStatusCode)
                 {
                     try
                     {
-                        // Deserialize the response using System.Text.Json to a type that matches the structure
-                        // Using JsonDocument for flexible parsing of the expected chat completion structure
                         using var doc = JsonDocument.Parse(responseContent);
                         var root = doc.RootElement;
 
-                        // Check for API-specific errors within the success response body
                         if (root.TryGetProperty("error", out var errorElement))
                         {
                             string errorMessage = errorElement.TryGetProperty("message", out var errorMessageElement) ? errorMessageElement.GetString() ?? errorElement.ToString() : errorElement.ToString();
@@ -334,16 +322,14 @@ namespace LLMAPI.Services.OpenRouter
                             throw new Exception($"OpenRouter API Error in success response body: {errorMessage}");
                         }
 
-                        // Extract the generated content from choices -> [0] -> message -> content
                         if (root.TryGetProperty("choices", out var choicesElement) &&
                             choicesElement.EnumerateArray().FirstOrDefault() is JsonElement firstChoice &&
                             firstChoice.TryGetProperty("message", out var messageElement) &&
                             messageElement.TryGetProperty("content", out var contentElement))
                         {
-                            return contentElement.GetString() ?? ""; // Return the content string, default to empty if somehow null
+                            return contentElement.GetString() ?? "";
                         }
 
-                        // Case: Success status but no expected content structure or API error
                         Console.WriteLine("Warning: Successful response but no valid content found in expected format or API error structure.");
                         throw new Exception("Model returned a successful response, but no content was found in expected format.");
 
@@ -355,15 +341,12 @@ namespace LLMAPI.Services.OpenRouter
                     }
                     catch (Exception parseEx) when (parseEx is not HttpRequestException && parseEx is not JsonException)
                     {
-                        // Handle other potential structured response parsing errors not covered by JsonException
-                        Console.WriteLine($"Unexpected error parsing OpenRouter API success response structure: {parseEx.Message}. Response: {responseContent}"); // Dev logging
+                        Console.WriteLine($"Unexpected error parsing OpenRouter API success response structure: {parseEx.Message}. Response: {responseContent}");
                         throw new Exception($"Unexpected format in LLM service success response: {parseEx.Message}", parseEx);
                     }
                 }
-                // Handle non-success response statuses (e.g., 4xx, 5xx)
                 else
                 {
-                    // Attempt to extract error details from the response body using System.Text.Json
                     string errorDetails = responseContent;
                     try
                     {
@@ -371,13 +354,11 @@ namespace LLMAPI.Services.OpenRouter
                         var root = errorDoc.RootElement;
                         if (root.TryGetProperty("error", out var errorElement))
                         {
-                            // Attempt to get nested message, fallback to error object string itself
                             errorDetails = errorElement.TryGetProperty("message", out var errorMessageElement) ? errorMessageElement.GetString() ?? errorElement.ToString() : errorElement.ToString();
                         }
                     }
                     catch (JsonException)
                     {
-                        // Ignore JSON parsing error if the response isn't structured JSON
                         Console.WriteLine("Warning: Failed to parse error response as JSON from OpenRouter.");
                     }
                     catch (Exception parseEx)
@@ -388,27 +369,23 @@ namespace LLMAPI.Services.OpenRouter
 
                     string errorMsg = $"OpenRouter API returned non-success status code {response.StatusCode}. Details: {errorDetails}";
                     Console.WriteLine(errorMsg);
-                    // Throw HttpRequestException for non-success status codes
-                    response.EnsureSuccessStatusCode(); // This will throw HttpRequestException
-                    return null!; // This line is unreachable because EnsureSuccessStatusCode throws
+                    response.EnsureSuccessStatusCode();
+                    return null!;
                 }
             }
             catch (HttpRequestException httpEx)
             {
-                // Handle fundamental HTTP request errors (network issues, DNS failures, timeouts BEFORE getting a response, etc.)
-                Console.WriteLine($"HTTP Request Error sending to OpenRouter: {httpEx.Message}"); // Dev logging
-                throw; // Re-throw the exception after logging
+                Console.WriteLine($"HTTP Request Error sending to OpenRouter: {httpEx.Message}");
+                throw;
             }
             catch (Exception ex)
             {
-                // Catch any other unexpected errors during the process
-                Console.WriteLine($"An unexpected error occurred during OpenRouter request: {ex}"); // Dev logging
-                throw new Exception("An unexpected error occurred during the LLM service request.", ex); // Wrap and re-throw
+                Console.WriteLine($"An unexpected error occurred during OpenRouter request: {ex}");
+                throw new Exception("An unexpected error occurred during the LLM service request.", ex);
             }
         }
 
 
-        // --- IImageFileService Implementation ---
 
         /// <summary>
         /// Converts an uploaded image file (<see cref="IFormFile"/>) to a <see cref="ByteString"/>.
@@ -420,8 +397,7 @@ namespace LLMAPI.Services.OpenRouter
         {
             if (imageFile == null || imageFile.Length == 0)
             {
-                // _logger.LogWarning("ConvertImageToByteString called with null or empty IFormFile.");
-                Console.WriteLine("Warning: ConvertImageToByteString called with null or empty IFormFile."); // Dev logging
+                Console.WriteLine("Warning: ConvertImageToByteString called with null or empty IFormFile.");
                 return null;
             }
 
@@ -489,9 +465,7 @@ namespace LLMAPI.Services.OpenRouter
                 throw new Exception($"An error occurred while downloading/reading image from URL: {url}", ex);
             }
 
-            // Add this line to satisfy the compiler that something is always returned or thrown
-            // Given the catch-all Exception, this should theoretically never be reached,
-            // but it satisfies the code path analysis.
+          
             throw new InvalidOperationException("Unexpected code path reached in ReadImageFileAsync.");
         }
 

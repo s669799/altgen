@@ -1,5 +1,4 @@
-﻿// LLMAPI.Controllers/CNNController.cs
-using LLMAPI.DTO; // Need CNNWorkflowRequest, CnnPredictResponse
+﻿using LLMAPI.DTO;
 using LLMAPI.Enums;
 using LLMAPI.Helpers;
 using LLMAPI.Services.Interfaces;
@@ -7,13 +6,12 @@ using LLMAPI.Service.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
-using System.IO; // Used for Path.GetFileName
+using System.IO;
 
 namespace LLMAPI.Controllers
 {
-    // API controller for the CNN-enhanced LLM workflow.
     [ApiController]
-    [Route("api/cnn-llm")] // New route specifically for this workflow
+    [Route("api/cnn-llm")]
     public class CNNController : ControllerBase
     {
         private readonly IImageRecognitionService _imageRecognitionService;
@@ -23,6 +21,12 @@ namespace LLMAPI.Controllers
         //private const string DefaultCnnAltTextPrompt = "Write an alt text for this image";
         private const string DefaultCnnAltTextPrompt = "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar.";
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="CNNController"/> class.
+        /// </summary>
+        /// <param name="imageRecognitionService">The service for image recognition using LLMs.</param>
+        /// <param name="imageFileService">The service for handling image files.</param>
+        /// <param name="cnnPredictionService">The service for CNN predictions.</param>
         public CNNController(
             IImageRecognitionService imageRecognitionService,
             IImageFileService imageFileService,
@@ -33,7 +37,14 @@ namespace LLMAPI.Controllers
             _cnnPredictionService = cnnPredictionService;
         }
 
-
+        /// <summary>
+        /// Predicts the aircraft in an image using a CNN and then sends the image and CNN prediction to an LLM for analysis and alt text generation.
+        /// </summary>
+        /// <param name="request">The request containing the image URL and LLM parameters.</param>
+        /// <returns>An action result containing the LLM generated alt text response.</returns>
+        /// <response code="200">Returns the successfully generated alt text.</response>
+        /// <response code="400">If the request payload is invalid or the image cannot be downloaded.</response>
+        /// <response code="500">If an internal server error occurs during the CNN prediction or LLM analysis.</response>
         [DisableRequestSizeLimit]
         [RequestFormLimits(MultipartBodyLengthLimit = 209715200)]
         [HttpPost("predict")]
@@ -72,7 +83,7 @@ namespace LLMAPI.Controllers
                     Console.WriteLine($"Error: CNN prediction failed. Details: {cnnErrorDetail}");
 
                     return StatusCode(500, $"CNN prediction failed: {cnnErrorDetail}");
-       
+
                 }
                 Console.WriteLine($"CNN Prediction received: {cnnPrediction.PredictedAircraft} ({cnnPrediction.Probability:P1})");
 

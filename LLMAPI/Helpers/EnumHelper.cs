@@ -22,7 +22,7 @@ namespace LLMAPI.Helpers
             EnumMemberAttribute attribute = (EnumMemberAttribute)field.GetCustomAttribute(typeof(EnumMemberAttribute));
             string value = attribute != null ? attribute.Value : enumValue.ToString();
 
-            Console.WriteLine($"Enum value for {enumValue}: {value}");  // Debug logging
+            Console.WriteLine($"Enum value for {enumValue}: {value}");
             return value;
         }
     }

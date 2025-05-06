@@ -39,10 +39,22 @@ namespace LLMAPI.Enums
         Gemini2_5FlashLite,
 
         /// <summary>
+        /// Google's Gemini 2.0 Flash Lite model.
+        /// </summary>
+        [EnumMember(Value = "google/gemma-3-4b-it")]
+        Gemma3_4B,
+
+        /// <summary>
         /// Google's Gemini 2.5 Flash Preview) model.
         /// </summary>
         [EnumMember(Value = "google/gemini-2.5-flash-preview")]
         Gemini2_5FlashPreview,
+
+        /// <summary>
+        /// Anthropic's Claude 3 Opus model.
+        /// </summary>
+        [EnumMember(Value = "anthropic/claude-3-opus")]
+        Claude3Opus,
 
         /// <summary>
         /// Anthropic's Claude 3.7 Sonnet model.
@@ -132,6 +144,7 @@ namespace LLMAPI.Enums
         /// Microsoft's Phi-4 Multimodal Instruct model.
         /// </summary>
         [EnumMember(Value = "microsoft/phi-4-multimodal-instruct")]
-        MicrosoftPhi4MultimodalInstruct
+        MicrosoftPhi4MultimodalInstruct,
+
     }
 }

@@ -15,6 +15,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace LLMAPI.Controllers
 {
+    /// <summary>
+    /// API controller for interacting with the Replicate API, providing image analysis with an optional CNN cognitive layer.
+    /// </summary>
     [ApiController]
     [Route("api/replicate")]
     public class ReplicateController : ControllerBase
@@ -25,6 +28,14 @@ namespace LLMAPI.Controllers
         private readonly IConfiguration _configuration;
         private readonly ILogger<ReplicateController> _logger;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReplicateController"/> class.
+        /// </summary>
+        /// <param name="replicateService">The service for interacting with the Replicate API.</param>
+        /// <param name="imageFileService">The service for handling image files (downloading from URL).</param>
+        /// <param name="cnnPredictionService">The service for CNN prediction (cognitive layer).</param>
+        /// <param name="configuration">The application configuration.</param>
+        /// <param name="logger">The logger for this controller.</param>
         public ReplicateController(
             IReplicateService replicateService,
             IImageFileService imageFileService,
@@ -39,6 +50,15 @@ namespace LLMAPI.Controllers
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
+        /// <summary>
+        /// Runs a specific Replicate model instance, optionally using a CNN prediction as a cognitive layer for the prompt.
+        /// Currently configured to use the 'e5caf557dd9e5dcee46442e1315291ef1867f027991ede8ff95e304d4f734200' model version.
+        /// </summary>
+        /// <param name="input">The request body containing the image URL and optional prompt, temperature, and cognitive layer preference.</param>
+        /// <returns>An action result containing the generated output from the Replicate model if successful.</returns>
+        /// <response code="200">Returns the successfully generated model output.</response>
+        /// <response code="400">If the input is invalid or the image URL is missing.</response>
+        /// <response code="500">If an internal server error occurs during communication with services or processing.</response>
         [HttpPost("RunModel")]
         [ProducesResponseType(typeof(object), 200)]
         [ProducesResponseType(typeof(string), 400)]
@@ -60,13 +80,12 @@ namespace LLMAPI.Controllers
 
             const string basePrompt = "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar.";
 
-            string fileName = new Uri(input.Image).Segments.LastOrDefault() ?? "image"; // Get filename early for potential use
-
+            string fileName = new Uri(input.Image).Segments.LastOrDefault() ?? "image";
 
             string cnnContext = "";
             string noYappingInstruction = "Be specific about model and variant of depicted object if applicable. Do not mention this context in the alt text.";
 
-            if (input.EnableCognitiveLayer ?? true) // If EnableCognitiveLayer is null, treat it as true
+            if (input.EnableCognitiveLayer ?? true)
             {
                 ByteString imageBytes;
                 try
@@ -114,29 +133,22 @@ namespace LLMAPI.Controllers
                 _logger.LogInformation("Cognitive Layer disabled. Skipping CNN prediction.");
             }
 
-
-            // Build the composite prompt in the desired order: CONTEXT + NOYAPPING + (Base Prompt + User Prompt)
-            // CNN context will be empty if EnableCognitiveLayer was false
             string compositePrompt = cnnContext;
 
-            // Add the no yapping instruction if CNN context was included OR if the base prompt is not just whitespace
-            // This prevents an empty prompt if no CNN context and no base prompt
             if (!string.IsNullOrWhiteSpace(cnnContext) || !string.IsNullOrWhiteSpace(basePrompt) || !string.IsNullOrWhiteSpace(input.Prompt))
             {
                 compositePrompt += noYappingInstruction;
             }
 
-
             compositePrompt += " " + basePrompt;
 
             if (!string.IsNullOrWhiteSpace(input.Prompt) && !input.Prompt.Equals("string", StringComparison.OrdinalIgnoreCase))
             {
-                // Add a separator only if the base prompt is not empty
                 if (!string.IsNullOrWhiteSpace(basePrompt))
                 {
                     compositePrompt += ". " + input.Prompt;
                 }
-                else // If base prompt is empty, just append the user prompt
+                else
                 {
                     compositePrompt += input.Prompt;
                 }
@@ -145,8 +157,7 @@ namespace LLMAPI.Controllers
             var replicateInput = new Dictionary<string, object>
             {
                 { "image", input.Image },
-                { "prompt", compositePrompt }, // <-- CORRECTED: Use the compositePrompt here
-                // Use the Temperature from the input DTO, defaulting to 1.0 as requested
+                { "prompt", compositePrompt },
                 { "temperature", input.Temperature ?? 1.0 }
             };
 
@@ -168,6 +179,12 @@ namespace LLMAPI.Controllers
             }
         }
 
+        /// <summary>
+        /// Polls the Replicate API for the result of a prediction until it is completed (succeeded or failed).
+        /// </summary>
+        /// <param name="predictionId">The ID of the prediction to poll.</param>
+        /// <returns>The raw JSON output string from the successful prediction.</returns>
+        /// <exception cref="Exception">Thrown if the prediction fails or encounters an unexpected status.</exception>
         private async Task<string> PollForPredictionResult(string predictionId)
         {
             while (true)
