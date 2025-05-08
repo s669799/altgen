@@ -1,9 +1,8 @@
-// LLMAPI.Services/OpenRouter/OpenRouterService.cs
 using LLMAPI.DTO;
 using LLMAPI.Enums;
 using LLMAPI.Helpers;
 using LLMAPI.Services.Interfaces;
-// using LLMAPI.Service.Interfaces; // Double check if this is needed or a typo
+using LLMAPI.Service.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using System;
@@ -11,9 +10,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Text;
-using System.Text.Json; // Use System.Text.Json
-using System.Text.Json.Serialization; // Use System.Text.Json.Serialization attributes
-using System.Text.Json.Nodes; // For JsonDocument parsing
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Google.Protobuf;
 using System.Net.Http.Headers;
@@ -29,23 +28,17 @@ namespace LLMAPI.Services.OpenRouter
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IConfiguration _configuration;
-        // Consider adding an ILogger for robust logging in production
-        // private readonly ILogger<OpenRouterService> _logger;
-
+ 
         /// <summary>
         /// Initializes a new instance of the <see cref="OpenRouterService"/> class.
         /// </summary>
         /// <param name="httpClientFactory">Factory for creating HTTP clients.</param>
         /// <param name="configuration">Application configuration provider.</param>
-        // public OpenRouterService(IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<OpenRouterService> logger)
-        public OpenRouterService(IHttpClientFactory httpClientFactory, IConfiguration configuration /*, ILogger<OpenRouterService> logger */)
+        public OpenRouterService(IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
             _httpClientFactory = httpClientFactory;
             _configuration = configuration;
-            // _logger = logger;
         }
-
-        // --- ITextGenerationService Implementation ---
 
         /// <summary>
         /// Generates text using a specified model and prompt via the OpenRouter API.
@@ -60,14 +53,12 @@ namespace LLMAPI.Services.OpenRouter
         {
             if (string.IsNullOrWhiteSpace(model))
             {
-                // _logger.LogError("GenerateText called with null or empty model.");
-                Console.WriteLine("Error: GenerateText called with null or empty model."); // Dev logging
+                Console.WriteLine("Error: GenerateText called with null or empty model.");
                 throw new ArgumentNullException(nameof(model), "Model cannot be null or empty.");
             }
             if (string.IsNullOrWhiteSpace(prompt))
             {
-                // _logger.LogWarning("GenerateText called with null or empty prompt.");
-                Console.WriteLine("Warning: GenerateText called with null or empty prompt."); // Dev logging
+                Console.WriteLine("Warning: GenerateText called with null or empty prompt.");
                 throw new ArgumentNullException(nameof(prompt), "Prompt cannot be null or empty.");
             }
 
@@ -83,8 +74,6 @@ namespace LLMAPI.Services.OpenRouter
 
             return await SendRequest(requestData);
         }
-
-        // --- IImageRecognitionService Implementation ---
 
         /// <summary>
         /// Analyzes an image from a given URL using a specified model and prompt, potentially including CNN context.
@@ -116,7 +105,7 @@ namespace LLMAPI.Services.OpenRouter
             }
             if (string.IsNullOrWhiteSpace(imageUrl))
             {
-                Console.WriteLine("Error: AnalyzeImage (URL) called with null or empty imageUrl."); 
+                Console.WriteLine("Error: AnalyzeImage (URL) called with null or empty imageUrl.");
                 throw new ArgumentNullException(nameof(imageUrl), "Image URL cannot be null or empty.");
             }
 
@@ -161,15 +150,15 @@ namespace LLMAPI.Services.OpenRouter
         /// <exception cref="Exception">Thrown for API-specific errors indicated in the response body.</exception>
         public async Task<string> AnalyzeImage(
             string model,
-            ByteString imageBytes, // Accepts ByteString data
-            string textPrompt, // Base prompt (user + default)
-            string? predictedAircraft, // CNN data (expected from CNN workflow)
-            double? probability,       // CNN data (expected from CNN workflow)
+            ByteString imageBytes,
+            string textPrompt,
+            string? predictedAircraft,
+            double? probability,
             double temperature)
         {
             if (string.IsNullOrWhiteSpace(model))
             {
-                Console.WriteLine("Error: AnalyzeImage (Bytes) called with null or empty model."); 
+                Console.WriteLine("Error: AnalyzeImage (Bytes) called with null or empty model.");
                 throw new ArgumentNullException(nameof(model), "Model cannot be null or empty.");
             }
             if (imageBytes == null || imageBytes.Length == 0)
@@ -178,8 +167,7 @@ namespace LLMAPI.Services.OpenRouter
                 throw new ArgumentNullException(nameof(imageBytes), "Image bytes cannot be null or empty.");
             }
 
-            string compositePrompt = BuildCompositePrompt(textPrompt, predictedAircraft, probability);
-
+            string compositePrompt = BuildCompositePrompt(textPrompt, predictedAircraft, probability); 
             string base64Image = imageBytes.ToBase64();
             string mimeType = "image/jpg";
             string dataUri = $"data:{mimeType};base64,{base64Image}";
@@ -198,7 +186,6 @@ namespace LLMAPI.Services.OpenRouter
                         {
                             new { type = "text", text = compositePrompt },
                             new { type = "image_url", image_url = new { url = dataUri } }
-
                         }
                     }
                 }
