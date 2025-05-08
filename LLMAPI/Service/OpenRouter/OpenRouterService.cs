@@ -68,7 +68,6 @@ namespace LLMAPI.Services.OpenRouter
             {
                 // _logger.LogWarning("GenerateText called with null or empty prompt.");
                 Console.WriteLine("Warning: GenerateText called with null or empty prompt."); // Dev logging
-                // Depending on API, empty prompt might be allowed, but for robustness, let's check
                 throw new ArgumentNullException(nameof(prompt), "Prompt cannot be null or empty.");
             }
 
@@ -80,10 +79,9 @@ namespace LLMAPI.Services.OpenRouter
                 {
                     new { role = "user", content = prompt }
                 }
-                // Add other parameters like temperature, max_tokens if needed by your standard text generation
             };
 
-            return await SendRequest(requestData); // SendRequest is responsible for error handling and throwing
+            return await SendRequest(requestData);
         }
 
         // --- IImageRecognitionService Implementation ---
@@ -105,35 +103,31 @@ namespace LLMAPI.Services.OpenRouter
         /// <exception cref="Exception">Thrown for API-specific errors indicated in the response body.</exception>
         public async Task<string> AnalyzeImage(
             string model,
-            string imageUrl, // Accepts URL string
-            string textPrompt, // Base prompt (user + default)
-            string? predictedAircraft, // Optional CNN data (from LLMRequest)
-            double? probability,       // Optional CNN data (from LLMRequest)
+            string imageUrl,
+            string textPrompt,
+            string? predictedAircraft,
+            double? probability,
             double temperature)
         {
             if (string.IsNullOrWhiteSpace(model))
             {
-                // _logger.LogError("AnalyzeImage (URL) called with null or empty model.");
-                Console.WriteLine("Error: AnalyzeImage (URL) called with null or empty model."); // Dev logging
+                Console.WriteLine("Error: AnalyzeImage (URL) called with null or empty model.");
                 throw new ArgumentNullException(nameof(model), "Model cannot be null or empty.");
             }
             if (string.IsNullOrWhiteSpace(imageUrl))
             {
-                // _logger.LogError("AnalyzeImage (URL) called with null or empty imageUrl.");
-                Console.WriteLine("Error: AnalyzeImage (URL) called with null or empty imageUrl."); // Dev logging
-                                                                                                    // Note: textPrompt can be null/empty if the client provides no prompt and you don't fallback to a default *here*
-                                                                                                    // but the controller should handle the default prompt logic.
+                Console.WriteLine("Error: AnalyzeImage (URL) called with null or empty imageUrl."); 
                 throw new ArgumentNullException(nameof(imageUrl), "Image URL cannot be null or empty.");
             }
 
 
-            string compositePrompt = BuildCompositePrompt(textPrompt, predictedAircraft, probability); // Builds prompt including optional CNN data
+            string compositePrompt = BuildCompositePrompt(textPrompt, predictedAircraft, probability);
 
             var requestData = new
             {
                 model,
                 temperature,
-                max_tokens = 500, // Example value, configure as needed
+                max_tokens = 500,
                 messages = new List<object>
                 {
                     new {
@@ -141,13 +135,12 @@ namespace LLMAPI.Services.OpenRouter
                         content = new List<object>
                         {
                             new { type = "text", text = compositePrompt },
-                            // OpenRouter supports 'image_url' with a direct URL
                             new { type = "image_url", image_url = new { url = imageUrl } }
                         }
                     }
                 }
             };
-            return await SendRequest(requestData); // SendRequest is responsible for error handling and throwing
+            return await SendRequest(requestData);
         }
 
 
@@ -176,29 +169,19 @@ namespace LLMAPI.Services.OpenRouter
         {
             if (string.IsNullOrWhiteSpace(model))
             {
-                // _logger.LogError("AnalyzeImage (Bytes) called with null or empty model.");
-                Console.WriteLine("Error: AnalyzeImage (Bytes) called with null or empty model."); // Dev logging
+                Console.WriteLine("Error: AnalyzeImage (Bytes) called with null or empty model."); 
                 throw new ArgumentNullException(nameof(model), "Model cannot be null or empty.");
             }
             if (imageBytes == null || imageBytes.Length == 0)
             {
-                // _logger.LogError("AnalyzeImage (Bytes) called with null or empty imageBytes.");
-                Console.WriteLine("Error: AnalyzeImage (Bytes) called with null or empty imageBytes."); // Dev logging
+                Console.WriteLine("Error: AnalyzeImage (Bytes) called with null or empty imageBytes.");
                 throw new ArgumentNullException(nameof(imageBytes), "Image bytes cannot be null or empty.");
             }
-            // Note: textPrompt, predictedAircraft, probability can be null depending on workflow/client input.
-            // BuildCompositePrompt handles null/empty values for CNN parts.
 
-            string compositePrompt = BuildCompositePrompt(textPrompt, predictedAircraft, probability); // Builds prompt including CNN data
+            string compositePrompt = BuildCompositePrompt(textPrompt, predictedAircraft, probability);
 
             string base64Image = imageBytes.ToBase64();
-            // OpenRouter API image_url content type generally accepts Data URIs
-            // Format: data:<mime_type>;base64,<base64_data>
-            // You might need a helper to determine MIME type from imageBytes signature or filename if available.
-            // For simplicity, assuming png or jpg - adjust based on need and OpenRouter docs.
-            // Determine actual MIME type if possible, otherwise default
-            // string mimeType = ImageHelper.GetMimeType(imageBytes) ?? "image/jpeg"; // Example helper call
-            string mimeType = "image/jpg"; // Default or placeholder
+            string mimeType = "image/jpg";
             string dataUri = $"data:{mimeType};base64,{base64Image}";
 
 
@@ -206,7 +189,7 @@ namespace LLMAPI.Services.OpenRouter
             {
                 model,
                 temperature,
-                max_tokens = 500, // Example value, configure as needed
+                max_tokens = 500,
                 messages = new List<object>
                 {
                     new {
@@ -214,16 +197,14 @@ namespace LLMAPI.Services.OpenRouter
                         content = new List<object>
                         {
                             new { type = "text", text = compositePrompt },
-                            // OpenRouter generally prefers 'image_url' with a Data URI for base64
                             new { type = "image_url", image_url = new { url = dataUri } }
-                            // Check OpenRouter docs if they have a specific 'image_bytes' type with just base64
-                            // new { type = "image_bytes", image_bytes = base64Image } // Use this if OpenRouter documentation specifies this type
+
                         }
                     }
                 }
             };
 
-            return await SendRequest(requestData); // SendRequest is responsible for error handling and throwing
+            return await SendRequest(requestData);
         }
 
         /// <summary>
