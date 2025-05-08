@@ -6,7 +6,7 @@ namespace LLMAPI.DTO
     /// <summary>
     /// Represents the result of processing a prompt for an image analysis task.
     /// </summary>
-    public class PromptResult
+    public class LLMResponse
     {
         /// <summary>
         /// Gets or sets the prompt text that was used.
@@ -28,9 +28,9 @@ namespace LLMAPI.DTO
         /// </summary>
         public string ImageUrl { get; set; }
         /// <summary>
-        /// Gets or sets a list of <see cref="PromptResult"/> objects, each representing the response to a different prompt for this image.
+        /// Gets or sets a list of <see cref="LLMResponse"/> objects, each representing the response to a different prompt for this image.
         /// </summary>
-        public List<PromptResult> Results { get; set; } = new();
+        public List<LLMResponse> Results { get; set; } = new();
     }
 
     /// <summary>

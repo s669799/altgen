@@ -148,7 +148,7 @@ namespace ImageAnalysisConsole
                                 try
                                 {
                                     string response = await ProcessImage(apiUrl, openRouterApiKey, selectedModel, prompt, imageUrl);
-                                    imageResult.Results.Add(new PromptResult { Prompt = prompt, Response = response });
+                                    imageResult.Results.Add(new LLMResponse { Prompt = prompt, Response = response });
 
                                     // Write CSV record for each prompt and image
                                     csv.WriteRecord(new CsvOutputRecord
@@ -165,7 +165,7 @@ namespace ImageAnalysisConsole
                                 catch (Exception ex)
                                 {
                                     Console.WriteLine($"Error processing Model: {selectedModel}, Image: {imageUrl}, Prompt: {prompt}. Error: {ex.Message}");
-                                    imageResult.Results.Add(new PromptResult { Prompt = prompt, Response = $"Error: {ex.Message}" });
+                                    imageResult.Results.Add(new LLMResponse { Prompt = prompt, Response = $"Error: {ex.Message}" });
 
                                     // Write CSV record for error case
                                     csv.WriteRecord(new CsvOutputRecord
