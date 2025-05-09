@@ -1,5 +1,4 @@
-﻿// LLMAPI.DTO/CnnPredictResponse.cs
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace LLMAPI.DTO
 {
@@ -35,7 +34,7 @@ namespace LLMAPI.DTO
         /// <summary>
         /// Optional: An error message detail provided by the CNN service in case of failure.
         /// </summary>
-        [JsonPropertyName("detail")] // Assuming 'detail' is used for error messages in FastAPI HTTP 500
+        [JsonPropertyName("detail")]
         public string? Detail { get; set; }
     }
 }

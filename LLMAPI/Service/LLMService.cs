@@ -105,7 +105,6 @@ namespace LLMAPI.Service
                     GrpcAdapter = RestGrpcAdapter.Default
                 }.Build();                
 
-                // Perform label detection on the image file
                 IReadOnlyList<EntityAnnotation> labels = await client.DetectLabelsAsync(image);
 
                 if (labels == null || labels.Count == 0)
@@ -113,7 +112,6 @@ namespace LLMAPI.Service
                     return "No labels detected.";
                 }
 
-                // Format results as alt text
                 var altText = new StringBuilder();
                 foreach (var label in labels)
                 {

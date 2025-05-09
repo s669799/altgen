@@ -1,15 +1,14 @@
-﻿// LLMAPI.Helpers/MimeHelper.cs
-using System.IO; // Required for Path.GetExtension
-using System.Runtime.InteropServices; // Required for RuntimeInformation
-using Microsoft.Win32; // Required for Registry key lookup (Windows only)
-using System; // Required for Exception, UriKind
+﻿using System.IO;
+using System.Runtime.InteropServices;
+using Microsoft.Win32;
+using System; 
 
-namespace LLMAPI.Helpers // Use a suitable namespace for helpers
+namespace LLMAPI.Helpers
 {
     /// <summary>
     /// Helper class to determine MIME types from file extensions.
     /// </summary>
-    public static class MimeHelper // Make it static as there's no state
+    public static class MimeHelper
     {
         /// <summary>
         /// Gets the MIME type for a given file name based on its extension.

@@ -2,7 +2,7 @@ using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using System.Linq;
-using Microsoft.AspNetCore.Http; // Make sure to add this using for IFormFile
+using Microsoft.AspNetCore.Http;
 
 /// <summary>
 /// An Operation Filter for Swagger/OpenAPI that configures request body for endpoints accepting file uploads (IFormFile).

@@ -61,7 +61,7 @@ namespace LLMAPI.Controllers
                         combinedPrompt += ". " + prompt;
                     }
 
-                    responseContent = await _imageRecognitionService.AnalyzeImage(modelString, imageUrl, combinedPrompt, null, null, temperature);
+                    responseContent = await _imageRecognitionService.AnalyzeImage(modelString, imageUrl, combinedPrompt, temperature);
                 }
                 else if (!string.IsNullOrWhiteSpace(prompt))
                 {
@@ -123,15 +123,13 @@ namespace LLMAPI.Controllers
 
                     if (!string.IsNullOrWhiteSpace(request.Prompt) && !request.Prompt.Equals("string", StringComparison.OrdinalIgnoreCase))
                     {
-                        finalPromptForLLM += ". " + request.Prompt;
+                        finalPromptForLLM += " " + request.Prompt;
                     }
 
                     responseContent = await _imageRecognitionService.AnalyzeImage(
                         modelString,
                         request.ImageUrl,
                         finalPromptForLLM,
-                        request.PredictedAircraft,
-                        request.Probability,
                         temperature);
                 }
                 else if (!string.IsNullOrWhiteSpace(request.Prompt))

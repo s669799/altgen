@@ -31,22 +31,6 @@ namespace LLMAPI.DTO
         public string? ImageUrl { get; set; }
 
         /// <summary>
-        /// Gets or sets the predicted aircraft type from a preceding CNN analysis (optional).
-        /// This field is intended to be provided BY THE CLIENT if they have already run the CNN.
-        /// </summary>
-        [System.Text.Json.Serialization.JsonPropertyName("predicted_aircraft")]
-        [DefaultValue(null)]
-        public string? PredictedAircraft { get; set; } = null;
-
-        /// <summary>
-        /// Gets or sets the probability associated with the CNN prediction (optional).
-        /// This field is intended to be provided BY THE CLIENT if they have already run the CNN.
-        /// </summary>
-        [System.Text.Json.Serialization.JsonPropertyName("probability")]
-        [DefaultValue(null)]
-        public double? Probability { get; set; } = null;
-
-        /// <summary>
         /// Gets or sets the temperature of the request [0.0, 2.0] (optional). Defaults to 1.0.
         /// </summary>
         [Range(0.0, 2.0, ErrorMessage = "Temperature must be between 0.0 and 2.0.")]

@@ -5,16 +5,16 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using LLMAPI.Enums;
-using Newtonsoft.Json;
 using LLMAPI.DTO;
 using CsvHelper;
 using CsvHelper.Configuration;
 using System.Globalization;
-using System.Formats.Asn1;
 using Google.Cloud.Storage.V1;
+using System.Text.Encodings.Web;
 
 namespace ImageAnalysisConsole
 {
@@ -24,6 +24,43 @@ namespace ImageAnalysisConsole
     /// </summary>
     class Program
     {
+        /// <summary>
+        /// Represents a single model/prompt response for the console application's output JSON format.
+        /// Includes the ModelType directly, unlike the API's LLMResponse.
+        /// </summary>
+        public class ConsoleLLMResponseOutput
+        {
+            [JsonConverter(typeof(JsonStringEnumConverter))]
+            public ModelType Model { get; set; }
+            public string Prompt { get; set; }
+            public string Response { get; set; }
+        }
+
+        /// <summary>
+        /// Represents the consolidated analysis results for a single image
+        /// in the console application's output JSON format.
+        /// Contains a list of ConsoleLLMResponseOutput objects.
+        /// </summary>
+        public class ConsoleImageAnalysisResultOutput
+        {
+            public string ImageUrl { get; set; }
+            public List<ConsoleLLMResponseOutput> Results { get; set; } = new();
+        }
+
+        /// <summary>
+        /// Represents a record for CSV output, containing the model, image URL, prompt, and response.
+        /// This is kept separate from the API DTOs for clarity in output formatting.
+        /// </summary>
+        public sealed class CsvOutputRecord
+        {
+            public ModelType Model { get; set; }
+            public string ImageUrl { get; set; }
+            public string Prompt { get; set; }
+            public string Response { get; set; }
+        }
+
+
+
         /// <summary>
         /// Main entry point of the console application. Configures the application, fetches images from specified folders and their subfolders in a bucket,
         /// tests specified LLMs against these images, and saves the analysis results in separate folders for each processed folder path.
@@ -42,32 +79,31 @@ namespace ImageAnalysisConsole
 
             Console.WriteLine($"ApiBaseUrl from config: {apiBaseUrl}");
             Console.WriteLine($"Full API URL: {apiUrl}");
-            Console.WriteLine($"OpenRouter API Key (first 4 chars): {openRouterApiKey?.Substring(0, 4)}...");
+            Console.WriteLine($"OpenRouter API Key (first 4 chars): {(string.IsNullOrEmpty(openRouterApiKey) ? "N/A" : openRouterApiKey.Substring(0, Math.Min(4, openRouterApiKey.Length)) + "...")}");
 
             string bucketName = "altgen_dam_bucket";
             List<string> folderPaths = new List<string>()
             {
-                "imagenet-sample-images/imagenet10",        // Options: imagenet10, imagenet20, imagenet50
-                "Cifar-10/sample10",                        // Options: sample10, sample30, sample100 (now with subfolder support)
-                "airplanes",                                // Options: airplanes (20 images)
-                "random-images"                             // Options: random-images (10 images)
+                "imagenet-sample-images/imagenet1",
+                //"Cifar-10/sample10",
+                "airplanesInternet",
+                "random-images/random1"
             };
 
-            // List of prompts for the request.
             List<string> prompts = new List<string>()
             {
-                "Write an alt text for this image.", //remove this shit, and this V
-                "Write a concise alt text identifying the key subjects or objects in this image and briefly describe the setting or context.",
+                "Write an alt text for this image.",
                 "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar."
             };
 
-            // List of ModelType enums representing the Large Language Models to be tested.
             List<ModelType> modelsToTest = new List<ModelType>()
             {
                 ModelType.ChatGpt4_1,
-                ModelType.ChatGpt4_1Mini,
-                ModelType.Gemini2_5Flash,
-                ModelType.Gemini2_5FlashLite,
+                ModelType.ChatGpt4_1Nano,
+                ModelType.ChatGpt4o,
+                ModelType.Gemini2_0Flash,
+                ModelType.Gemini2_0FlashLite,
+                ModelType.Gemini2_5FlashPreview,
                 ModelType.Claude3_7Sonnet,
                 ModelType.Claude3_5Haiku,
                 ModelType.Qwen2_5Vl72bInstruct,
@@ -81,6 +117,7 @@ namespace ImageAnalysisConsole
                 ModelType.MicrosoftPhi4MultimodalInstruct
             };
 
+
             string baseResultsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../..", "Results");
             baseResultsFolder = Path.GetFullPath(baseResultsFolder);
 
@@ -89,108 +126,131 @@ namespace ImageAnalysisConsole
                 Directory.CreateDirectory(baseResultsFolder);
             }
 
-
             foreach (string folderPath in folderPaths)
             {
-                // Add folder separator to console output
-                Console.WriteLine("\n" + new string('-', 50)); // Separator line
+                Console.WriteLine("\n" + new string('-', 50));
                 Console.WriteLine($"--- Processing Folder: {folderPath} ---");
-                Console.WriteLine(new string('-', 50)); // Separator line
-
+                Console.WriteLine(new string('-', 50));
 
                 List<string> imageUrls = await GetImageUrlsFromBucket(bucketName, folderPath);
 
                 if (imageUrls.Count == 0)
                 {
                     Console.WriteLine($"No images found in bucket '{bucketName}/{folderPath}' or an error occurred. Please check the bucket name and permissions.");
-                    continue; // Skip to the next folder if no images are found or an error occurs
+                    continue;
                 }
 
                 Console.WriteLine($"Found {imageUrls.Count} images in bucket '{bucketName}/{folderPath}'.");
 
-                // Construct timestamped folder name including bucket and path for each folder processed
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                string folderPathForName = string.IsNullOrEmpty(folderPath) ? "bucket_root" : folderPath.Replace('/', '_'); // Replace slashes with underscores
+                string folderPathForName = string.IsNullOrEmpty(folderPath) ? "bucket_root" : folderPath.Replace('/', '_');
                 string timestampFolderName = $"{timestamp}_{bucketName}_{folderPathForName}";
                 string resultsFolder = Path.Combine(baseResultsFolder, timestampFolderName);
-                Directory.CreateDirectory(resultsFolder); // Create the new folder
+                Directory.CreateDirectory(resultsFolder);
 
-                // Output folder name, bucket name, and folder path at the start of each folder processing
                 Console.WriteLine($"\n--- Run Information ---");
                 Console.WriteLine($"  Results Folder: {resultsFolder}");
                 Console.WriteLine($"  Bucket Name:    {bucketName}");
-                Console.WriteLine($"  Bucket Folder:  {folderPath ?? "(Bucket Root)"}"); // Handle null folderPath
+                Console.WriteLine($"  Bucket Folder:  {folderPath ?? "(Bucket Root)"}");
+                Console.WriteLine($"  Number of Prompts: {prompts.Count}");
+                Console.WriteLine($"  Number of Models: {modelsToTest.Count}");
+
+                List<CsvOutputRecord> allCsvRecords = new();
+                List<ConsoleImageAnalysisResultOutput> allJsonResults = new();
 
 
-                foreach (var selectedModel in modelsToTest)
+                string csvPath = Path.Combine(resultsFolder, $"image_analysis_results_consolidated.csv");
+                string jsonPath = Path.Combine(resultsFolder, $"image_analysis_results_consolidated.json");
+
+                var configCsv = new CsvConfiguration(CultureInfo.InvariantCulture)
                 {
-                    List<ImageAnalysisResult> allResults = new();
+                    TrimOptions = TrimOptions.Trim,
+                    AllowComments = true,
+                    HasHeaderRecord = true,
+                    Delimiter = ","
+                };
 
-                    // CSV Setup for each model within each folder
-                    string modelNameForFile = selectedModel.ToString();
-                    string csvPath = Path.Combine(resultsFolder, $"image_analysis_results_{modelNameForFile}.csv"); // Files in timestamped subfolder
+                foreach (string imageUrl in imageUrls)
+                {
+                    Console.WriteLine($"\nProcessing Image: {imageUrl}");
+                    ConsoleImageAnalysisResultOutput imageResultForJson = new() { ImageUrl = imageUrl, Results = new List<ConsoleLLMResponseOutput>() };
 
-                    using (var writer = new StreamWriter(csvPath))
-                    using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)))
+
+                    foreach (string prompt in prompts)
                     {
-                        // Write CSV header
-                        csv.WriteHeader<CsvOutputRecord>();
-                        csv.NextRecord();
-
-                        Console.WriteLine($"\n--- Testing Model: {selectedModel} ---");
-
-                        foreach (string imageUrl in imageUrls)
+                        Console.WriteLine($"  Testing Prompts for Image: {imageUrl}");
+                        foreach (var selectedModel in modelsToTest)
                         {
-                            ImageAnalysisResult imageResult = new() { ImageUrl = imageUrl };
-
-                            foreach (string prompt in prompts)
+                            try
                             {
-                                try
+                                Console.WriteLine($"    Testing Model: {selectedModel} with Prompt: {prompt.Substring(0, Math.Min(prompt.Length, 50))}...");
+                                string response = await ProcessImage(apiUrl, openRouterApiKey, selectedModel, prompt, imageUrl);
+
+                                imageResultForJson.Results.Add(new ConsoleLLMResponseOutput
                                 {
-                                    string response = await ProcessImage(apiUrl, openRouterApiKey, selectedModel, prompt, imageUrl);
-                                    imageResult.Results.Add(new LLMResponse { Prompt = prompt, Response = response });
+                                    Model = selectedModel,
+                                    Prompt = prompt,
+                                    Response = response
+                                });
 
-                                    // Write CSV record for each prompt and image
-                                    csv.WriteRecord(new CsvOutputRecord
-                                    {
-                                        Model = selectedModel,
-                                        ImageUrl = imageUrl,
-                                        Prompt = prompt,
-                                        Response = response
-                                    });
-                                    csv.NextRecord();
-
-                                    Console.WriteLine($"Model: {selectedModel}, Image: {imageUrl}, Prompt: {prompt}, Response: {response.Substring(0, Math.Min(response.Length, 100))}...");
-                                }
-                                catch (Exception ex)
+                                allCsvRecords.Add(new CsvOutputRecord
                                 {
-                                    Console.WriteLine($"Error processing Model: {selectedModel}, Image: {imageUrl}, Prompt: {prompt}. Error: {ex.Message}");
-                                    imageResult.Results.Add(new LLMResponse { Prompt = prompt, Response = $"Error: {ex.Message}" });
+                                    Model = selectedModel,
+                                    ImageUrl = imageUrl,
+                                    Prompt = prompt,
+                                    Response = response
+                                });
 
-                                    // Write CSV record for error case
-                                    csv.WriteRecord(new CsvOutputRecord
-                                    {
-                                        Model = selectedModel,
-                                        ImageUrl = imageUrl,
-                                        Prompt = prompt,
-                                        Response = $"Error: {ex.Message}"
-                                    });
-                                    csv.NextRecord();
-                                }
+                                Console.WriteLine($"      Success. Response Length: {response.Length}. First 100 chars: {response.Substring(0, Math.Min(response.Length, 100))}...");
                             }
-                            allResults.Add(imageResult);
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"      Error processing Model: {selectedModel}, Image: {imageUrl}, Prompt: {prompt.Substring(0, Math.Min(prompt.Length, 50))}... Error: {ex.Message}");
+
+                                imageResultForJson.Results.Add(new ConsoleLLMResponseOutput
+                                {
+                                    Model = selectedModel,
+                                    Prompt = prompt,
+                                    Response = $"Error: {ex.Message}"
+                                });
+
+                                allCsvRecords.Add(new CsvOutputRecord
+                                {
+                                    Model = selectedModel,
+                                    ImageUrl = imageUrl,
+                                    Prompt = prompt,
+                                    Response = $"Error: {ex.Message}"
+                                });
+                            }
                         }
-                    } // CSV writer will be flushed and closed here
+                        Console.WriteLine($"  Finished testing all models for Prompt: {prompt.Substring(0, Math.Min(prompt.Length, 50))}...");
+                    }
+                    allJsonResults.Add(imageResultForJson);
 
-                    // JSON Output - Files are placed in the timestamped subfolder for each model within each folder
-                    string jsonPath = Path.Combine(resultsFolder, $"image_analysis_results_{modelNameForFile}.json");
-                    File.WriteAllText(jsonPath, JsonConvert.SerializeObject(allResults, Formatting.Indented));
-                    Console.WriteLine($"Results for {selectedModel} written as JSON to {jsonPath}");
-                    Console.WriteLine($"Results for {selectedModel} written as CSV to {csvPath}");
                 }
-            } // Folder path loop ends here, next folder path will be processed
 
-            Console.WriteLine("\nAll folder and model tests completed. Results saved in individual folders within the Results folder.");
+                using (var writer = new StreamWriter(csvPath)) 
+                using (var csv = new CsvWriter(writer, configCsv))
+                {
+                    csv.WriteHeader<CsvOutputRecord>();
+                    csv.NextRecord();
+                    csv.WriteRecords(allCsvRecords);
+                }
+
+                var systemTextJsonSerializerOptions = new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    Converters = { new JsonStringEnumConverter() },
+                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                };
+
+                File.WriteAllText(jsonPath, JsonSerializer.Serialize(allJsonResults, systemTextJsonSerializerOptions));
+
+                Console.WriteLine($"\nConsolidated results for folder '{folderPath}' written as CSV to {csvPath}");
+                Console.WriteLine($"Consolidated results for folder '{folderPath}' written as JSON to {jsonPath}");
+            }
+
+            Console.WriteLine("\nAll folder processing completed. Consolidated results saved in individual folder-stamped directories within the Results folder.");
         }
 
         /// <summary>
@@ -201,8 +261,9 @@ namespace ImageAnalysisConsole
         /// <param name="model">The <see cref="ModelType"/> enum value, specifying which LLM model to use for analysis.</param>
         /// <param name="prompt">The prompt text to guide the LLM in generating the alt text.</param>
         /// <param name="imageUrl">The public URL of the image to be analyzed.</param>
+        /// <param name="temperature">Optional temperature setting for the LLM (defaults to 1.0 in API if null).</param>
         /// <returns>A string containing the generated alt text response from the API, or an error message on failure.</returns>
-        static async Task<string> ProcessImage(string apiUrl, string apiKey, ModelType model, string prompt, string imageUrl)
+        static async Task<string> ProcessImage(string apiUrl, string apiKey, ModelType model, string prompt, string imageUrl, double? temperature = null)
         {
             using (HttpClient client = new HttpClient())
             {
@@ -214,13 +275,21 @@ namespace ImageAnalysisConsole
                 {
                     Model = model,
                     Prompt = prompt,
-                    ImageUrl = imageUrl
+                    ImageUrl = imageUrl,
+                    Temperature = temperature
                 };
 
-                var jsonContent = JsonConvert.SerializeObject(requestData);
+                var requestSerializerOptions = new JsonSerializerOptions
+                {
+                    WriteIndented = false,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestData, requestSerializerOptions);
+
+
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-                // Construct the full API endpoint URL for processing requests via request body.
                 string fullUrl = $"{apiUrl}/process-request-body";
 
                 HttpResponseMessage response = await client.PostAsync(fullUrl, content);
@@ -230,74 +299,96 @@ namespace ImageAnalysisConsole
                 {
                     try
                     {
-                        // Deserialize the JSON response to extract the text content.
-                        var jsonResponse = JsonConvert.DeserializeObject<Dictionary<string, string>>(responseContent);
-                        if (jsonResponse != null && jsonResponse.ContainsKey("response"))
+                        var apiResponse = JsonSerializer.Deserialize<ApiResponseDTO>(responseContent);
+                        if (apiResponse != null && apiResponse.Response != null)
                         {
-                            return jsonResponse["response"];
+                            return apiResponse.Response;
                         }
-                        return "No valid response found in JSON"; // Indicate if no 'response' key is found.
+                        return $"API Success but unexpected response format: {response.Content.Headers.ContentType?.MediaType} - {responseContent}";
+                    }
+                    catch (JsonException ex)
+                    {
+                        return $"Error parsing API success response JSON: {ex.Message}. Raw Response: {responseContent}";
                     }
                     catch (Exception ex)
                     {
-                        return $"Error parsing response: {ex.Message}"; // Error message if JSON parsing fails.
+                        return $"Unexpected error processing API success response: {ex.Message}. Raw Response: {responseContent}";
                     }
                 }
                 else
                 {
-                    return $"Error: {response.StatusCode} - {responseContent}"; // Return status code and content for HTTP errors.
+                    string errorDetails = responseContent;
+                    try
+                    {
+                        var errorResponse = JsonSerializer.Deserialize<ApiErrorResponseDTO>(responseContent);
+                        if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Error))
+                        {
+                            errorDetails = errorResponse.Error;
+                        }
+                        else if (errorResponse != null && errorResponse.Errors?.Any() == true)
+                        {
+                            errorDetails = string.Join("; ", errorResponse.Errors.Select(e => e.ErrorMessage));
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    return $"Error from API: {response.StatusCode} - {errorDetails}";
                 }
             }
         }
 
-        /// <summary>
-        /// Helper method to retrieve the EnumMember Value of a <see cref="ModelType"/> enum.
-        /// This value is used when sending requests to the API to specify the model in string format as expected by the API.
-        /// </summary>
-        /// <param name="value">The <see cref="ModelType"/> enum value for which to get the EnumMember attribute's Value.</param>
-        /// <returns>The string value associated with the EnumMember attribute of the enum, or the enum's name if no attribute is set.</returns>
-        static string GetEnumMemberValue(ModelType value)
+        private class ApiResponseDTO
         {
-            var enumType = value.GetType();
-            var memberInfo = enumType.GetMember(value.ToString()).FirstOrDefault();
-
-            if (memberInfo != null)
-            {
-                var enumMemberAttribute = (System.Runtime.Serialization.EnumMemberAttribute)memberInfo.GetCustomAttributes(typeof(System.Runtime.Serialization.EnumMemberAttribute), false).FirstOrDefault();
-                if (enumMemberAttribute != null && !string.IsNullOrEmpty(enumMemberAttribute.Value))
-                {
-                    return enumMemberAttribute.Value;
-                }
-            }
-            return value.ToString(); // Fallback to ToString if EnumMember attribute is not defined or has no value.
+            [JsonPropertyName("response")]
+            public string? Response { get; set; }
         }
+
+        private class ApiErrorResponseDTO
+        {
+            [JsonPropertyName("error")]
+            public string? Error { get; set; }
+            [JsonPropertyName("errors")]
+            public List<ApiErrorValidationDTO>? Errors { get; set; }
+        }
+
+
+        private class ApiErrorValidationDTO
+        {
+            [JsonPropertyName("propertyName")]
+            public string? PropertyName { get; set; }
+            [JsonPropertyName("errorMessage")]
+            public string? ErrorMessage { get; set; }
+        }
+
 
         /// <summary>
         /// Retrieves a list of image URLs from a Google Cloud Storage bucket, including images from **within the specified folder and all its subfolders**.
         /// Returns the count of images found in the logs.
         /// </summary>
-        /// <param name="bucketName">The name of the GCS bucket to access.</param>
+        /// <param name="bucketName">The name of the Google Cloud Storage bucket to access.</param>
         /// <param name="folderPath">Optional. If specified, images from **this folder and all subfolders** are listed. If null or empty, images from the bucket root are listed.</param>
         /// <returns>A List of strings, each being a publicly accessible URL for an image in the specified GCS bucket and folder (or subfolder). Returns an empty list if no images are found or an error occurs.</returns>
         static async Task<List<string>> GetImageUrlsFromBucket(string bucketName, string folderPath = null)
         {
             var storageClient = await StorageClient.CreateAsync();
             var imageUrls = new List<string>();
-            int imageCount = 0; // Initialize image counter
+            int imageCount = 0;
 
             try
             {
                 string prefix = folderPath;
                 if (!string.IsNullOrEmpty(prefix))
                 {
-                    // Ensure the prefix ends with a '/' to only match within the folder
                     if (!prefix.EndsWith("/"))
                     {
                         prefix += "/";
                     }
                 }
 
-                // List objects in the bucket, using the potentially modified prefix.
                 var objectList = string.IsNullOrEmpty(prefix)
                     ? storageClient.ListObjectsAsync(bucketName)
                     : storageClient.ListObjectsAsync(bucketName, prefix: prefix);
@@ -305,24 +396,22 @@ namespace ImageAnalysisConsole
 
                 await foreach (var storageObject in objectList)
                 {
-                    // Check if the storage object's content type indicates it's an image.
-                    if (storageObject.ContentType.StartsWith("image/"))
+                    if (storageObject.ContentType != null && storageObject.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Construct the public URL for accessing the image.
                         string imageUrl = $"https://storage.googleapis.com/{bucketName}/{storageObject.Name}";
                         imageUrls.Add(imageUrl);
-                        imageCount++; // Increment the image count
+                        imageCount++;
                     }
                 }
-                Console.WriteLine($"    Found {imageCount} images in folder and subfolders."); // Output total count of images found, now including subfolders
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error listing objects in bucket {bucketName} (folder: {folderPath}): {ex.Message}");
-                return new List<string>(); // Return an empty list in case of any error.
+                return new List<string>();
             }
 
-            return imageUrls; // Return the list of image URLs found.
+            Console.WriteLine($"    Found {imageCount} images in folder and subfolders for bucket '{bucketName}/{folderPath ?? "(Bucket Root)"}'.");
+            return imageUrls;
         }
     }
 }

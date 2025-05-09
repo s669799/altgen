@@ -12,7 +12,6 @@ using LLMAPI.Service.Replicate;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add controllers with JSON options so that enums are serialized as strings.
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
@@ -22,7 +21,6 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    // Include XML comments in Swagger
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
@@ -33,7 +31,6 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddHttpClient();
 
-// Register services...
 builder.Services.AddScoped<OpenRouterService>();
 builder.Services.AddScoped<IImageRecognitionService>(sp => sp.GetRequiredService<OpenRouterService>());
 builder.Services.AddScoped<IImageFileService>(sp => sp.GetRequiredService<OpenRouterService>());

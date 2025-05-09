@@ -37,7 +37,6 @@ namespace LLMAPI.Services.Google
         /// <returns>The generated text, obtained via delegation to <see cref="OpenRouterService"/>.</returns>
         public async Task<string> GenerateText(string model, string prompt)
         {
-            // Call OpenRouterService to generate text using the Google model
             return await _openRouterService.GenerateText(model, prompt);
         }
     }

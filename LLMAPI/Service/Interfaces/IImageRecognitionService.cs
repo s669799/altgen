@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using System.Threading.Tasks;
-using Google.Protobuf; // Ensure this using is present if using ByteString
+using Google.Protobuf;
 
 namespace LLMAPI.Services.Interfaces
 {
@@ -9,6 +9,20 @@ namespace LLMAPI.Services.Interfaces
     /// </summary>
     public interface IImageRecognitionService
     {
+        /// <summary>
+        /// Analyzes an image given its URL, without pre-calculated CNN context.
+        /// </summary>
+        /// <param name="model">The model identifier (e.g., "openai/gpt-4o").</param>
+        /// <param name="imageUrl">The image URL.</param>
+        /// <param name="textPrompt">Base text prompt to guide image analysis.</param>
+        /// <param name="temperature">Optional temperature parameter [0.0, 2.0].</param>
+        /// <returns>The image description returned by the model.</returns>
+        Task<string> AnalyzeImage(
+            string model,
+            string imageUrl,
+            string textPrompt,
+            double temperature = 1.0);
+
         /// <summary>
         /// Analyzes an image given its URL, potentially using context from a CNN prediction.
         /// </summary>
@@ -44,6 +58,5 @@ namespace LLMAPI.Services.Interfaces
             string? predictedAircraft,
             double? probability,
             double temperature = 1.0);
-
     }
 }
