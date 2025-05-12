@@ -1,27 +1,45 @@
+using System.Text.Json.Serialization;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Reflection;
-using Microsoft.AspNetCore.OpenApi;
-using LLMAPI.Controllers;
-using LLMAPI.Service;
+using LLMAPI.Service.Interfaces;
+using LLMAPI.Services.Interfaces;
+using LLMAPI.Services.OpenRouter;
+using LLMAPI.Services.Google;
+using LLMAPI.Services.CnnPrediction;
+using LLMAPI.Service.Replicate;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
-var configuration = builder.Configuration;
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
 
-// Add services to the container
-builder.Services.AddControllers(); // Register controllers
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    // Include XML comments in Swagger
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
-    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "API", Version = "v1" });
+    c.OperationFilter<FileUploadOperationFilter>();
+    c.EnableAnnotations();
 });
 
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<ILLMService, LLMService>();
+
+builder.Services.AddScoped<OpenRouterService>();
+builder.Services.AddScoped<IImageRecognitionService>(sp => sp.GetRequiredService<OpenRouterService>());
+builder.Services.AddScoped<IImageFileService>(sp => sp.GetRequiredService<OpenRouterService>());
+builder.Services.AddScoped<ITextGenerationService>(sp => sp.GetRequiredService<OpenRouterService>());
+builder.Services.AddScoped<IGoogleService, GoogleImageRecognitionService>();
+builder.Services.AddScoped<IImageFileService, GoogleImageRecognitionService>();
+builder.Services.AddScoped<IReplicateService, ReplicateService>();
+builder.Services.AddScoped<ICnnPredictionService, CNNPredictionService>();
+
 
 var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
 builder.Services.AddCors(options =>
@@ -29,7 +47,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: MyAllowSpecificOrigins,
         builder =>
         {
-            builder.WithOrigins("http://localhost:5173")
+            builder.WithOrigins("http://localhost:5256")
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         });
@@ -37,7 +55,6 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -45,28 +62,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "API v1");
+        c.RoutePrefix = "swagger";
     });
 }
 
 app.UseCors(MyAllowSpecificOrigins);
-// Ensure HTTPS Redirection middleware
 app.UseHttpsRedirection();
 app.UseAuthorization();
 
-// Redirect root URL to Swagger
-app.Use(async (context, next) =>
-{
-    if (context.Request.Path == "/")
-    {
-        context.Response.Redirect("/swagger");
-    }
-    else
-    {
-        await next.Invoke();
-    }
-});
-
-// Map controllers
 app.MapControllers();
 
 app.Run();
