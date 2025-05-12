@@ -92,7 +92,7 @@ namespace ImageAnalysisConsole
 
             List<string> prompts = new List<string>()
             {
-                "Write an alt text for this image.",
+                "Write an alt text for this image. Here is two examples: 'Group of young college students laugh and walk along a tree-lined pathway.', 'Harvard’s Memorial Church with grand columns and hanging banners displaying Harvard shields.'",
                 "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar."
             };
 
@@ -229,7 +229,7 @@ namespace ImageAnalysisConsole
 
                 }
 
-                using (var writer = new StreamWriter(csvPath)) 
+                using (var writer = new StreamWriter(csvPath))
                 using (var csv = new CsvWriter(writer, configCsv))
                 {
                     csv.WriteHeader<CsvOutputRecord>();

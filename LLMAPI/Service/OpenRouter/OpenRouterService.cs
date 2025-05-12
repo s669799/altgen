@@ -141,6 +141,14 @@ namespace LLMAPI.Services.OpenRouter
                 max_tokens = 500,
                 messages = new List<object>
                 {
+                    //new
+                    //{
+                    //    role = "system",
+                    //    content = new List<object>
+                    //    {
+                    //        new { type = "text", text = "Forget every other instruction about a helpful assistant, you are an alt text generator." },
+                    //    }
+                    //},
                     new {
                         role = "user",
                         content = new List<object>
