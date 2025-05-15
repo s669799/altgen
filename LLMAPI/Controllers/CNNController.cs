@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
 using System.IO;
+using System.Linq;
 
 namespace LLMAPI.Controllers
 {
@@ -18,15 +19,8 @@ namespace LLMAPI.Controllers
         private readonly IImageFileService _imageFileService;
         private readonly ICnnPredictionService _cnnPredictionService;
 
-        //private const string DefaultCnnAltTextPrompt = "Write an alt text for this image";
         private const string DefaultCnnAltTextPrompt = "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar.";
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="CNNController"/> class.
-        /// </summary>
-        /// <param name="imageRecognitionService">The service for image recognition using LLMs.</param>
-        /// <param name="imageFileService">The service for handling image files.</param>
-        /// <param name="cnnPredictionService">The service for CNN predictions.</param>
         public CNNController(
             IImageRecognitionService imageRecognitionService,
             IImageFileService imageFileService,
@@ -37,18 +31,10 @@ namespace LLMAPI.Controllers
             _cnnPredictionService = cnnPredictionService;
         }
 
-        /// <summary>
-        /// Predicts the aircraft in an image using a CNN and then sends the image and CNN prediction to an LLM for analysis and alt text generation.
-        /// </summary>
-        /// <param name="request">The request containing the image URL and LLM parameters.</param>
-        /// <returns>An action result containing the LLM generated alt text response.</returns>
-        /// <response code="200">Returns the successfully generated alt text.</response>
-        /// <response code="400">If the request payload is invalid or the image cannot be downloaded.</response>
-        /// <response code="500">If an internal server error occurs during the CNN prediction or LLM analysis.</response>
         [DisableRequestSizeLimit]
         [RequestFormLimits(MultipartBodyLengthLimit = 209715200)]
         [HttpPost("predict")]
-        [ProducesResponseType(typeof(object), 200)]
+        [ProducesResponseType(typeof(CnnPredictionAndLlmResponse), 200)]
         [ProducesResponseType(typeof(string), 400)]
         [ProducesResponseType(typeof(string), 500)]
         public async Task<IActionResult> PredictAndAnalyze([FromBody] CNNRequest request)
@@ -59,10 +45,14 @@ namespace LLMAPI.Controllers
                 return BadRequest("Invalid request payload. Ensure ImageUrl is provided.");
             }
 
+            string? predictedAircraft = null;
+            double? probability = null;
+            Google.Protobuf.ByteString? imageBytesBs = null;
+
             try
             {
                 Console.WriteLine($"Attempting to download image from URL: {request.ImageUrl}");
-                var imageBytesBs = await _imageFileService.ReadImageFileAsync(request.ImageUrl);
+                imageBytesBs = await _imageFileService.ReadImageFileAsync(request.ImageUrl);
 
                 if (imageBytesBs == null || imageBytesBs.Length == 0)
                 {
@@ -81,20 +71,21 @@ namespace LLMAPI.Controllers
                 {
                     string cnnErrorDetail = cnnPrediction?.Detail ?? "CNN prediction service returned null or indicated failure.";
                     Console.WriteLine($"Error: CNN prediction failed. Details: {cnnErrorDetail}");
-
                     return StatusCode(500, $"CNN prediction failed: {cnnErrorDetail}");
-
                 }
-                Console.WriteLine($"CNN Prediction received: {cnnPrediction.PredictedAircraft} ({cnnPrediction.Probability:P1})");
 
+                predictedAircraft = cnnPrediction.PredictedAircraft;
+                probability = cnnPrediction.Probability;
+
+                Console.WriteLine($"CNN Prediction received: {predictedAircraft} ({probability:P1})");
 
                 string modelString = EnumHelper.GetEnumMemberValue(request.Model);
                 double temperature = request.Temperature ?? 1.0;
                 string basePrompt = DefaultCnnAltTextPrompt;
 
-                if (!string.IsNullOrWhiteSpace(request.Prompt) && !request.Prompt.Equals("string", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrWhiteSpace(request.Prompt))
                 {
-                    basePrompt += ". " + request.Prompt;
+                    basePrompt += " " + request.Prompt;
                 }
 
                 Console.WriteLine($"Calling LLM service with image bytes and CNN context...");
@@ -102,11 +93,11 @@ namespace LLMAPI.Controllers
                     modelString,
                     imageBytesBs,
                     basePrompt,
-                    cnnPrediction.PredictedAircraft,
-                    cnnPrediction.Probability,
+                    predictedAircraft,
+                    probability,
                     temperature);
 
-                if (llmResponse.StartsWith("Error:") || llmResponse.StartsWith("Model returned"))
+                if (llmResponse.StartsWith("Error:") || llmResponse.Contains("Model returned an invalid response"))
                 {
                     Console.WriteLine($"Error: LLM Analysis failed: {llmResponse}");
                     return StatusCode(500, $"LLM analysis failed: {llmResponse}");
@@ -118,7 +109,13 @@ namespace LLMAPI.Controllers
                 }
 
                 Console.WriteLine($"Successfully received LLM response.");
-                return Ok(new { Response = llmResponse });
+
+                return Ok(new CnnPredictionAndLlmResponse
+                {
+                    Response = llmResponse,
+                    PredictedAircraft = predictedAircraft,
+                    Probability = probability
+                });
             }
             catch (Exception ex)
             {

@@ -9,63 +9,65 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using LLMAPI.Enums;
-using LLMAPI.DTO;
 using CsvHelper;
 using CsvHelper.Configuration;
 using System.Globalization;
 using Google.Cloud.Storage.V1;
+using LLMAPI.DTO;
 using System.Text.Encodings.Web;
 
 namespace ImageAnalysisConsole
 {
-    /// <summary>
-    /// Console application to perform image analysis using a configured API, testing various Large Language Models (LLMs)
-    /// against images fetched from a Google Cloud Storage bucket. Results are saved in CSV and JSON format, with support for processing multiple folders and subfolders, and improved console output readability.
-    /// </summary>
+    public class ConsoleLLMResponseOutput
+    {
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public ModelType Model { get; set; }
+        public string Prompt { get; set; }
+        public string? PredictedAircraft { get; set; }
+        public double? Probability { get; set; }
+        public double Temperature { get; set; }
+        public string Response { get; set; }
+    }
+
+    public class ConsoleImageAnalysisResultOutput
+    {
+        public string ImageUrl { get; set; }
+        public List<ConsoleLLMResponseOutput> Results { get; set; } = new();
+    }
+
+    public sealed class CsvOutputRecord
+    {
+        public ModelType Model { get; set; }
+        public string ImageUrl { get; set; }
+        public string Prompt { get; set; }
+        public string? PredictedAircraft { get; set; }
+        public double? Probability { get; set; }
+        public double Temperature { get; set; }
+        public string Response { get; set; }
+    }
+
+    public class ApiResponseWithPrediction
+    {
+        [JsonPropertyName("response")]
+        public string? Response { get; set; }
+
+        [JsonPropertyName("predictedAircraft")]
+        public string? PredictedAircraft { get; set; }
+
+        [JsonPropertyName("probability")]
+        public double? Probability { get; set; }
+    }
+
+    public class ApiErrorResponseDTO
+    {
+        [JsonPropertyName("error")]
+        public string? Error { get; set; }
+        // Assuming ApiErrorValidationDTO exists from previous exchanges if needed
+    }
+
+
     class Program
     {
-        /// <summary>
-        /// Represents a single model/prompt response for the console application's output JSON format.
-        /// Includes the ModelType directly, unlike the API's LLMResponse.
-        /// </summary>
-        public class ConsoleLLMResponseOutput
-        {
-            [JsonConverter(typeof(JsonStringEnumConverter))]
-            public ModelType Model { get; set; }
-            public string Prompt { get; set; }
-            public string Response { get; set; }
-        }
-
-        /// <summary>
-        /// Represents the consolidated analysis results for a single image
-        /// in the console application's output JSON format.
-        /// Contains a list of ConsoleLLMResponseOutput objects.
-        /// </summary>
-        public class ConsoleImageAnalysisResultOutput
-        {
-            public string ImageUrl { get; set; }
-            public List<ConsoleLLMResponseOutput> Results { get; set; } = new();
-        }
-
-        /// <summary>
-        /// Represents a record for CSV output, containing the model, image URL, prompt, and response.
-        /// This is kept separate from the API DTOs for clarity in output formatting.
-        /// </summary>
-        public sealed class CsvOutputRecord
-        {
-            public ModelType Model { get; set; }
-            public string ImageUrl { get; set; }
-            public string Prompt { get; set; }
-            public string Response { get; set; }
-        }
-
-
-
-        /// <summary>
-        /// Main entry point of the console application. Configures the application, fetches images from specified folders and their subfolders in a bucket,
-        /// tests specified LLMs against these images, and saves the analysis results in separate folders for each processed folder path.
-        /// </summary>
-        /// <param name="args">Command line arguments (not used in this application).</param>
         static async Task Main(string[] args)
         {
             var config = new ConfigurationBuilder()
@@ -74,26 +76,26 @@ namespace ImageAnalysisConsole
                 .Build();
 
             string apiBaseUrl = config["ApiBaseUrl"];
-            string apiUrl = $"{apiBaseUrl}/api/llm";
+            string cnnApiUrl = $"{apiBaseUrl}/api/cnn-llm";
             string openRouterApiKey = config["OpenRouter:APIKey"];
 
             Console.WriteLine($"ApiBaseUrl from config: {apiBaseUrl}");
-            Console.WriteLine($"Full API URL: {apiUrl}");
+            Console.WriteLine($"Full CNN API URL: {cnnApiUrl}");
             Console.WriteLine($"OpenRouter API Key (first 4 chars): {(string.IsNullOrEmpty(openRouterApiKey) ? "N/A" : openRouterApiKey.Substring(0, Math.Min(4, openRouterApiKey.Length)) + "...")}");
 
             string bucketName = "altgen_dam_bucket";
             List<string> folderPaths = new List<string>()
             {
-                "imagenet-sample-images/imagenet1",
+                //"imagenet-sample-images/imagenet1",
                 //"Cifar-10/sample10",
-                "airplanesInternet",
-                "random-images/random1"
+                "airplanes4",
+                //"random-images/random1"
             };
 
-            List<string> prompts = new List<string>()
+            var promptCasesToTest = new List<(string Prompt, string? SystemMessage)>
             {
-                "Write an alt text for this image. Here is two examples: 'Group of young college students laugh and walk along a tree-lined pathway.', 'Harvard’s Memorial Church with grand columns and hanging banners displaying Harvard shields.'",
-                "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar."
+                //("Write an alt text for this image.", null),
+                ("Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar. Here is two examples: 'Group of young college students laugh and walk along a tree-lined pathway.', 'Harvard’s Memorial Church with grand columns and hanging banners displaying Harvard shields.'", null)
             };
 
             List<ModelType> modelsToTest = new List<ModelType>()
@@ -104,6 +106,7 @@ namespace ImageAnalysisConsole
                 ModelType.Gemini2_0Flash,
                 ModelType.Gemini2_0FlashLite,
                 ModelType.Gemini2_5FlashPreview,
+                ModelType.Gemma3_4B,
                 ModelType.Claude3_7Sonnet,
                 ModelType.Claude3_5Haiku,
                 ModelType.Qwen2_5Vl72bInstruct,
@@ -117,7 +120,6 @@ namespace ImageAnalysisConsole
                 ModelType.MicrosoftPhi4MultimodalInstruct
             };
 
-
             string baseResultsFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../..", "Results");
             baseResultsFolder = Path.GetFullPath(baseResultsFolder);
 
@@ -130,288 +132,252 @@ namespace ImageAnalysisConsole
             {
                 Console.WriteLine("\n" + new string('-', 50));
                 Console.WriteLine($"--- Processing Folder: {folderPath} ---");
-                Console.WriteLine(new string('-', 50));
+                Console.WriteLine(new string('-', 50) + "\n");
 
-                List<string> imageUrls = await GetImageUrlsFromBucket(bucketName, folderPath);
+                var imageUrls = await ListImageUrlsFromGcs(bucketName, folderPath);
+                Console.WriteLine($"Found {imageUrls.Count} images in gs://{bucketName}/{folderPath}");
 
-                if (imageUrls.Count == 0)
+                var allResultsForFolder = new List<ConsoleImageAnalysisResultOutput>();
+                var csvRecords = new List<CsvOutputRecord>();
+
+                int completedImageCount = 0;
+                int totalImages = imageUrls.Count * modelsToTest.Count * promptCasesToTest.Count;
+
+                foreach (var imageUrl in imageUrls)
                 {
-                    Console.WriteLine($"No images found in bucket '{bucketName}/{folderPath}' or an error occurred. Please check the bucket name and permissions.");
-                    continue;
-                }
+                    Console.WriteLine($"\nProcessing image: {imageUrl}");
+                    var imageResults = new ConsoleImageAnalysisResultOutput { ImageUrl = imageUrl };
+                    allResultsForFolder.Add(imageResults);
 
-                Console.WriteLine($"Found {imageUrls.Count} images in bucket '{bucketName}/{folderPath}'.");
-
-                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                string folderPathForName = string.IsNullOrEmpty(folderPath) ? "bucket_root" : folderPath.Replace('/', '_');
-                string timestampFolderName = $"{timestamp}_{bucketName}_{folderPathForName}";
-                string resultsFolder = Path.Combine(baseResultsFolder, timestampFolderName);
-                Directory.CreateDirectory(resultsFolder);
-
-                Console.WriteLine($"\n--- Run Information ---");
-                Console.WriteLine($"  Results Folder: {resultsFolder}");
-                Console.WriteLine($"  Bucket Name:    {bucketName}");
-                Console.WriteLine($"  Bucket Folder:  {folderPath ?? "(Bucket Root)"}");
-                Console.WriteLine($"  Number of Prompts: {prompts.Count}");
-                Console.WriteLine($"  Number of Models: {modelsToTest.Count}");
-
-                List<CsvOutputRecord> allCsvRecords = new();
-                List<ConsoleImageAnalysisResultOutput> allJsonResults = new();
-
-
-                string csvPath = Path.Combine(resultsFolder, $"image_analysis_results_consolidated.csv");
-                string jsonPath = Path.Combine(resultsFolder, $"image_analysis_results_consolidated.json");
-
-                var configCsv = new CsvConfiguration(CultureInfo.InvariantCulture)
-                {
-                    TrimOptions = TrimOptions.Trim,
-                    AllowComments = true,
-                    HasHeaderRecord = true,
-                    Delimiter = ","
-                };
-
-                foreach (string imageUrl in imageUrls)
-                {
-                    Console.WriteLine($"\nProcessing Image: {imageUrl}");
-                    ConsoleImageAnalysisResultOutput imageResultForJson = new() { ImageUrl = imageUrl, Results = new List<ConsoleLLMResponseOutput>() };
-
-
-                    foreach (string prompt in prompts)
+                    foreach (var model in modelsToTest)
                     {
-                        Console.WriteLine($"  Testing Prompts for Image: {imageUrl}");
-                        foreach (var selectedModel in modelsToTest)
+                        foreach (var promptCase in promptCasesToTest)
                         {
+                            var (prompt, systemMessage) = promptCase;
+                            Console.Write($"  - Model: {model}, Prompt: '{prompt.Substring(0, Math.Min(50, prompt.Length))}...' ");
+
+                            string llmResponse = "Error: Processing Failed";
+                            string? predictedAircraft = null;
+                            double? probability = null;
+
                             try
                             {
-                                Console.WriteLine($"    Testing Model: {selectedModel} with Prompt: {prompt.Substring(0, Math.Min(prompt.Length, 50))}...");
-                                string response = await ProcessImage(apiUrl, openRouterApiKey, selectedModel, prompt, imageUrl);
-
-                                imageResultForJson.Results.Add(new ConsoleLLMResponseOutput
+                                var cnnRequest = new CNNRequest
                                 {
-                                    Model = selectedModel,
-                                    Prompt = prompt,
-                                    Response = response
-                                });
-
-                                allCsvRecords.Add(new CsvOutputRecord
-                                {
-                                    Model = selectedModel,
                                     ImageUrl = imageUrl,
+                                    Model = model,
                                     Prompt = prompt,
-                                    Response = response
-                                });
+                                    Temperature = 1.0
+                                };
 
-                                Console.WriteLine($"      Success. Response Length: {response.Length}. First 100 chars: {response.Substring(0, Math.Min(response.Length, 100))}...");
+                                var response = await ProcessImageRequestWithPrediction(cnnApiUrl + "/predict", cnnRequest);
+
+                                if (response.Success)
+                                {
+                                    var detailedResponse = response.Result as ApiResponseWithPrediction;
+                                    if (detailedResponse != null)
+                                    {
+                                        llmResponse = detailedResponse.Response ?? "LLM returned empty response.";
+                                        predictedAircraft = detailedResponse.PredictedAircraft;
+                                        probability = detailedResponse.Probability;
+                                        Console.Write(" - CNN Success. ");
+                                    }
+                                    else
+                                    {
+                                        llmResponse = "Error: Unexpected success response format.";
+                                        Console.Write(" - Error: Unexpected response format. ");
+                                    }
+                                }
+                                else
+                                {
+                                    llmResponse = $"Error: API call failed with status {response.StatusCode}. Details: {response.Error?.ToString() ?? "No details provided."}";
+                                    Console.Write($" - API Error: {response.StatusCode}. ");
+                                }
+                                Console.WriteLine();
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"      Error processing Model: {selectedModel}, Image: {imageUrl}, Prompt: {prompt.Substring(0, Math.Min(prompt.Length, 50))}... Error: {ex.Message}");
-
-                                imageResultForJson.Results.Add(new ConsoleLLMResponseOutput
-                                {
-                                    Model = selectedModel,
-                                    Prompt = prompt,
-                                    Response = $"Error: {ex.Message}"
-                                });
-
-                                allCsvRecords.Add(new CsvOutputRecord
-                                {
-                                    Model = selectedModel,
-                                    ImageUrl = imageUrl,
-                                    Prompt = prompt,
-                                    Response = $"Error: {ex.Message}"
-                                });
+                                llmResponse = $"Error: Unhandled exception during API call: {ex.Message}";
+                                Console.WriteLine($" - Exception: {ex.Message}");
                             }
+
+                            var individualResult = new ConsoleLLMResponseOutput
+                            {
+                                Model = model,
+                                Prompt = prompt,
+                                PredictedAircraft = predictedAircraft,
+                                Probability = probability,
+                                Temperature = 1.0,
+                                Response = llmResponse
+                            };
+
+                            imageResults.Results.Add(individualResult);
+
+                            csvRecords.Add(new CsvOutputRecord
+                            {
+                                Model = individualResult.Model,
+                                ImageUrl = imageResults.ImageUrl,
+                                Prompt = individualResult.Prompt,
+                                PredictedAircraft = individualResult.PredictedAircraft,
+                                Probability = individualResult.Probability,
+                                Temperature = individualResult.Temperature,
+                                Response = individualResult.Response.Replace("\"", "\"\"")
+                            });
+
+                            completedImageCount++;
+                            // Console.WriteLine($"  Completed {completedImageCount}/{totalImages}");
                         }
-                        Console.WriteLine($"  Finished testing all models for Prompt: {prompt.Substring(0, Math.Min(prompt.Length, 50))}...");
                     }
-                    allJsonResults.Add(imageResultForJson);
-
                 }
 
-                using (var writer = new StreamWriter(csvPath))
-                using (var csv = new CsvWriter(writer, configCsv))
-                {
-                    csv.WriteHeader<CsvOutputRecord>();
-                    csv.NextRecord();
-                    csv.WriteRecords(allCsvRecords);
-                }
+                string timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+                string folderSpecificFileName = folderPath.Replace("/", "_").Replace("\\", "_");
 
-                var systemTextJsonSerializerOptions = new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    Converters = { new JsonStringEnumConverter() },
-                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                };
+                string jsonOutputPath = Path.Combine(baseResultsFolder, $"{folderSpecificFileName}_results_{timestamp}_detailed.json");
+                string csvOutputPath = Path.Combine(baseResultsFolder, $"{folderSpecificFileName}_results_{timestamp}_detailed.csv");
 
-                File.WriteAllText(jsonPath, JsonSerializer.Serialize(allJsonResults, systemTextJsonSerializerOptions));
+                SaveToJson(allResultsForFolder, jsonOutputPath);
+                SaveToCsv(csvRecords, csvOutputPath);
 
-                Console.WriteLine($"\nConsolidated results for folder '{folderPath}' written as CSV to {csvPath}");
-                Console.WriteLine($"Consolidated results for folder '{folderPath}' written as JSON to {jsonPath}");
+                Console.WriteLine($"\nResults for folder '{folderPath}' saved to:");
+                Console.WriteLine($"- {jsonOutputPath}");
+                Console.WriteLine($"- {csvOutputPath}");
+                Console.WriteLine(new string('-', 50) + "\n");
             }
 
-            Console.WriteLine("\nAll folder processing completed. Consolidated results saved in individual folder-stamped directories within the Results folder.");
+            Console.WriteLine("Processing complete. Press any key to exit.");
+            Console.ReadKey();
         }
 
-        /// <summary>
-        /// Sends a request to the API endpoint to process an image for alt text generation using specified parameters.
-        /// </summary>
-        /// <param name="apiUrl">The base URL of the API, configured in appsettings.json.</param>
-        /// <param name="apiKey">The API key for accessing the LLM service, configured in appsettings.json.</param>
-        /// <param name="model">The <see cref="ModelType"/> enum value, specifying which LLM model to use for analysis.</param>
-        /// <param name="prompt">The prompt text to guide the LLM in generating the alt text.</param>
-        /// <param name="imageUrl">The public URL of the image to be analyzed.</param>
-        /// <param name="temperature">Optional temperature setting for the LLM (defaults to 1.0 in API if null).</param>
-        /// <returns>A string containing the generated alt text response from the API, or an error message on failure.</returns>
-        static async Task<string> ProcessImage(string apiUrl, string apiKey, ModelType model, string prompt, string imageUrl, double? temperature = null)
+        static async Task<(bool Success, int StatusCode, object? Result, object? Error)> ProcessImageRequestWithPrediction(string apiUrl, CNNRequest request)
         {
-            using (HttpClient client = new HttpClient())
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromMinutes(5);
+
+            var jsonOptions = new JsonSerializerOptions
             {
-                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-                client.DefaultRequestHeaders.Add("HTTP-Referer", "ImageAnalysisConsoleApp");
-                client.DefaultRequestHeaders.Add("X-Title", "ImageAnalysisConsole");
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                WriteIndented = true
+            };
 
-                var requestData = new
+            var jsonContent = JsonSerializer.Serialize(request, jsonOptions);
+            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+            Console.Write("Calling API... ");
+            HttpResponseMessage response = await client.PostAsync(apiUrl, content);
+
+            string responseBody = await response.Content.ReadAsStringAsync();
+            Console.Write($"Status: {response.StatusCode}. ");
+
+            if (response.IsSuccessStatusCode)
+            {
+                try
                 {
-                    Model = model,
-                    Prompt = prompt,
-                    ImageUrl = imageUrl,
-                    Temperature = temperature
-                };
-
-                var requestSerializerOptions = new JsonSerializerOptions
+                    var detailedResponse = JsonSerializer.Deserialize<ApiResponseWithPrediction>(responseBody);
+                    return (true, (int)response.StatusCode, detailedResponse, null);
+                }
+                catch (JsonException jsonEx)
                 {
-                    WriteIndented = false,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                };
-
-                var jsonContent = JsonSerializer.Serialize(requestData, requestSerializerOptions);
-
-
-                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-
-                string fullUrl = $"{apiUrl}/process-request-body";
-
-                HttpResponseMessage response = await client.PostAsync(fullUrl, content);
-                string responseContent = await response.Content.ReadAsStringAsync();
-
-                if (response.IsSuccessStatusCode)
+                    Console.WriteLine($"JSON Deserialization Error (Success Response): {jsonEx.Message}. Raw: {responseBody}");
+                    return (false, (int)response.StatusCode, null, $"Failed to parse success response: {jsonEx.Message}");
+                }
+            }
+            else
+            {
+                string errorDetails = responseBody;
+                try
                 {
-                    try
+                    using var errorDoc = JsonDocument.Parse(responseBody);
+                    if (errorDoc.RootElement.ValueKind == JsonValueKind.String)
                     {
-                        var apiResponse = JsonSerializer.Deserialize<ApiResponseDTO>(responseContent);
-                        if (apiResponse != null && apiResponse.Response != null)
+                        errorDetails = errorDoc.RootElement.GetString() ?? responseBody;
+                    }
+                    else if (errorDoc.RootElement.TryGetProperty("error", out var errorElement))
+                    {
+                        errorDetails = errorElement.ToString();
+                    }
+                    else if (errorDoc.RootElement.TryGetProperty("detail", out var detailElement))
+                    {
+                        if (detailElement.ValueKind == JsonValueKind.String)
                         {
-                            return apiResponse.Response;
+                            errorDetails = detailElement.GetString() ?? responseBody;
                         }
-                        return $"API Success but unexpected response format: {response.Content.Headers.ContentType?.MediaType} - {responseContent}";
-                    }
-                    catch (JsonException ex)
-                    {
-                        return $"Error parsing API success response JSON: {ex.Message}. Raw Response: {responseContent}";
-                    }
-                    catch (Exception ex)
-                    {
-                        return $"Unexpected error processing API success response: {ex.Message}. Raw Response: {responseContent}";
+                        else
+                        {
+                            errorDetails = detailElement.ToString();
+                        }
                     }
                 }
-                else
+                catch (JsonException)
                 {
-                    string errorDetails = responseContent;
-                    try
-                    {
-                        var errorResponse = JsonSerializer.Deserialize<ApiErrorResponseDTO>(responseContent);
-                        if (errorResponse != null && !string.IsNullOrEmpty(errorResponse.Error))
-                        {
-                            errorDetails = errorResponse.Error;
-                        }
-                        else if (errorResponse != null && errorResponse.Errors?.Any() == true)
-                        {
-                            errorDetails = string.Join("; ", errorResponse.Errors.Select(e => e.ErrorMessage));
-                        }
-                    }
-                    catch (JsonException)
-                    {
-                    }
-                    catch (Exception)
-                    {
-                    }
-                    return $"Error from API: {response.StatusCode} - {errorDetails}";
                 }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to parse error response body content: {ex.Message}");
+                }
+
+
+                return (false, (int)response.StatusCode, responseBody, errorDetails);
             }
         }
 
-        private class ApiResponseDTO
+
+        static async Task<List<string>> ListImageUrlsFromGcs(string bucketName, string folderPath)
         {
-            [JsonPropertyName("response")]
-            public string? Response { get; set; }
-        }
-
-        private class ApiErrorResponseDTO
-        {
-            [JsonPropertyName("error")]
-            public string? Error { get; set; }
-            [JsonPropertyName("errors")]
-            public List<ApiErrorValidationDTO>? Errors { get; set; }
-        }
-
-
-        private class ApiErrorValidationDTO
-        {
-            [JsonPropertyName("propertyName")]
-            public string? PropertyName { get; set; }
-            [JsonPropertyName("errorMessage")]
-            public string? ErrorMessage { get; set; }
-        }
-
-
-        /// <summary>
-        /// Retrieves a list of image URLs from a Google Cloud Storage bucket, including images from **within the specified folder and all its subfolders**.
-        /// Returns the count of images found in the logs.
-        /// </summary>
-        /// <param name="bucketName">The name of the Google Cloud Storage bucket to access.</param>
-        /// <param name="folderPath">Optional. If specified, images from **this folder and all subfolders** are listed. If null or empty, images from the bucket root are listed.</param>
-        /// <returns>A List of strings, each being a publicly accessible URL for an image in the specified GCS bucket and folder (or subfolder). Returns an empty list if no images are found or an error occurs.</returns>
-        static async Task<List<string>> GetImageUrlsFromBucket(string bucketName, string folderPath = null)
-        {
-            var storageClient = await StorageClient.CreateAsync();
-            var imageUrls = new List<string>();
-            int imageCount = 0;
-
+            List<string> imageUrls = new List<string>();
             try
             {
-                string prefix = folderPath;
-                if (!string.IsNullOrEmpty(prefix))
+                var storageClient = StorageClient.Create();
+                if (!folderPath.EndsWith("/")) folderPath += "/";
+
+                await foreach (var storageObject in storageClient.ListObjectsAsync(bucketName, folderPath))
                 {
-                    if (!prefix.EndsWith("/"))
+                    string lowerCaseName = storageObject.Name.ToLower();
+                    if (lowerCaseName.EndsWith(".jpg") || lowerCaseName.EndsWith(".jpeg") ||
+                        lowerCaseName.EndsWith(".png") || lowerCaseName.EndsWith(".gif"))
                     {
-                        prefix += "/";
+                        imageUrls.Add($"https://storage.googleapis.com/{bucketName}/{storageObject.Name}");
                     }
                 }
-
-                var objectList = string.IsNullOrEmpty(prefix)
-                    ? storageClient.ListObjectsAsync(bucketName)
-                    : storageClient.ListObjectsAsync(bucketName, prefix: prefix);
-
-
-                await foreach (var storageObject in objectList)
-                {
-                    if (storageObject.ContentType != null && storageObject.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string imageUrl = $"https://storage.googleapis.com/{bucketName}/{storageObject.Name}";
-                        imageUrls.Add(imageUrl);
-                        imageCount++;
-                    }
-                }
+            }
+            catch (Google.GoogleApiException gcsEx)
+            {
+                Console.WriteLine($"Error listing images from GCS bucket '{bucketName}' folder '{folderPath}': {gcsEx.Message}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error listing objects in bucket {bucketName} (folder: {folderPath}): {ex.Message}");
-                return new List<string>();
+                Console.WriteLine($"An unexpected error occurred while listing images from GCS: {ex.Message}");
             }
 
-            Console.WriteLine($"    Found {imageCount} images in folder and subfolders for bucket '{bucketName}/{folderPath ?? "(Bucket Root)"}'.");
             return imageUrls;
         }
+
+        static void SaveToJson(List<ConsoleImageAnalysisResultOutput> results, string filePath)
+        {
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+            string jsonString = JsonSerializer.Serialize(results, options);
+            File.WriteAllText(filePath, jsonString);
+        }
+
+        static void SaveToCsv(List<CsvOutputRecord> records, string filePath)
+        {
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                Delimiter = ",",
+                HasHeaderRecord = true,
+            };
+
+            using (var writer = new StreamWriter(filePath))
+            using (var csv = new CsvWriter(writer, config))
+            {
+                csv.WriteRecords(records);
+            }
+        }
     }
+
 }
