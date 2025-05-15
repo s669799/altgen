@@ -30,13 +30,13 @@ namespace LLMAPI.Enums
         /// Google's Gemini 2.0 Flash model.
         /// </summary>
         [EnumMember(Value = "google/gemini-2.0-flash-001")]
-        Gemini2_5Flash,
+        Gemini2_0Flash,
 
         /// <summary>
         /// Google's Gemini 2.0 Flash Lite model.
         /// </summary>
         [EnumMember(Value = "google/gemini-2.0-flash-lite-001")]
-        Gemini2_5FlashLite,
+        Gemini2_0FlashLite,
 
         /// <summary>
         /// Google's Gemini 2.0 Flash Lite model.

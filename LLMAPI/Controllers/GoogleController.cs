@@ -9,6 +9,7 @@ namespace LLMAPI.Controllers
     /// <summary>
     /// API controller for accessing Google-specific services, including Google Vision API for image analysis.
     /// </summary>
+    [ApiExplorerSettings(IgnoreApi = true)]
     [ApiController]
     [Route("api/google")]
     public class GoogleController : ControllerBase

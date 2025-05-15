@@ -18,6 +18,7 @@ namespace LLMAPI.Controllers
     /// <summary>
     /// API controller for interacting with the Replicate API, providing image analysis with an optional CNN cognitive layer.
     /// </summary>
+    [ApiExplorerSettings(IgnoreApi = true)]
     [ApiController]
     [Route("api/replicate")]
     public class ReplicateController : ControllerBase

@@ -9,6 +9,11 @@ using LLMAPI.Services.Google;
 using LLMAPI.Services.CnnPrediction;
 using LLMAPI.Service.Replicate;
 
+var cultureInfo = new System.Globalization.CultureInfo("en-US");
+System.Globalization.CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
+System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
+
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add controllers with JSON options so that enums are serialized as strings.
@@ -48,7 +53,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins(
                 "http://localhost:5256",  // First origin
-                "http://localhost:5173"   // Vue dev server
+                "http://localhost:5173",   // Vue dev server
+                "https://localhost:5173"
             )
             .AllowAnyHeader()
             .AllowAnyMethod();

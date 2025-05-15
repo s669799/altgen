@@ -66,8 +66,8 @@ namespace ImageAnalysisConsole
             {
                 ModelType.ChatGpt4_1,
                 ModelType.ChatGpt4_1Mini,
-                ModelType.Gemini2_5Flash,
-                ModelType.Gemini2_5FlashLite,
+                ModelType.Gemini2_0Flash,
+                ModelType.Gemini2_0FlashLite,
                 ModelType.Claude3_7Sonnet,
                 ModelType.Claude3_5Haiku,
                 ModelType.Qwen2_5Vl72bInstruct,
