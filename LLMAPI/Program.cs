@@ -9,7 +9,6 @@ using LLMAPI.Services.Google;
 using LLMAPI.Services.CnnPrediction;
 using LLMAPI.Service.Replicate;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add controllers with JSON options so that enums are serialized as strings.
@@ -17,7 +16,6 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
-
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -33,7 +31,7 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.AddHttpClient();
 
-// Register services...
+// Register services
 builder.Services.AddScoped<OpenRouterService>();
 builder.Services.AddScoped<IImageRecognitionService>(sp => sp.GetRequiredService<OpenRouterService>());
 builder.Services.AddScoped<IImageFileService>(sp => sp.GetRequiredService<OpenRouterService>());
@@ -43,17 +41,18 @@ builder.Services.AddScoped<IImageFileService, GoogleImageRecognitionService>();
 builder.Services.AddScoped<IReplicateService, ReplicateService>();
 builder.Services.AddScoped<ICnnPredictionService, CNNPredictionService>();
 
-
-var MyAllowSpecificOrigins = "_myAllowSpecificOrigins";
+// Configure CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(name: MyAllowSpecificOrigins,
-        builder =>
-        {
-            builder.WithOrigins("http://localhost:5256")
-                .AllowAnyHeader()
-                .AllowAnyMethod();
-        });
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5256",  // First origin
+                "http://localhost:5173"   // Vue dev server
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
 });
 
 var app = builder.Build();
@@ -69,7 +68,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseCors(MyAllowSpecificOrigins);
+app.UseCors("AllowAll");
 app.UseHttpsRedirection();
 app.UseAuthorization();
 

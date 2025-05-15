@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
 using System.IO;
-
+using Google.Protobuf;
 namespace LLMAPI.Controllers
 {
     [ApiController]
@@ -45,86 +45,94 @@ namespace LLMAPI.Controllers
         /// <response code="200">Returns the successfully generated alt text.</response>
         /// <response code="400">If the request payload is invalid or the image cannot be downloaded.</response>
         /// <response code="500">If an internal server error occurs during the CNN prediction or LLM analysis.</response>
-        [DisableRequestSizeLimit]
-        [RequestFormLimits(MultipartBodyLengthLimit = 209715200)]
-        [HttpPost("predict")]
-        [ProducesResponseType(typeof(object), 200)]
-        [ProducesResponseType(typeof(string), 400)]
-        [ProducesResponseType(typeof(string), 500)]
-        public async Task<IActionResult> PredictAndAnalyze([FromBody] CNNRequest request)
+       [DisableRequestSizeLimit]
+[RequestFormLimits(MultipartBodyLengthLimit = 209_715_200)]
+[HttpPost("predict")]
+[ProducesResponseType(typeof(object), 200)]
+[ProducesResponseType(typeof(string), 400)]
+[ProducesResponseType(typeof(string), 500)]
+public async Task<IActionResult> PredictAndAnalyze([FromForm] CNNRequest request)
+{
+    if (request == null || request.Image == null || request.Image.Length == 0 || !ModelState.IsValid)
+    {
+        Console.WriteLine("Error: Incoming request is invalid or missing image file.");
+        return BadRequest("Invalid request. Ensure an image file is included.");
+    }
+
+    try
+    {
+        ByteString imageBytesBs;
+        using (var ms = new MemoryStream())
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.ImageUrl) || !ModelState.IsValid)
-            {
-                Console.WriteLine("Error: Incoming request is null, missing ImageUrl, or ModelState is invalid.");
-                return BadRequest("Invalid request payload. Ensure ImageUrl is provided.");
-            }
-
-            try
-            {
-                Console.WriteLine($"Attempting to download image from URL: {request.ImageUrl}");
-                var imageBytesBs = await _imageFileService.ReadImageFileAsync(request.ImageUrl);
-
-                if (imageBytesBs == null || imageBytesBs.Length == 0)
-                {
-                    Console.WriteLine($"Error: Failed to download image or received empty data from URL: {request.ImageUrl}");
-                    return BadRequest($"Could not download image from URL: {request.ImageUrl}. Ensure the URL is valid and accessible.");
-                }
-                Console.WriteLine($"Successfully downloaded image from URL: {request.ImageUrl}");
-
-                string filename = Path.GetFileName(request.ImageUrl);
-                if (string.IsNullOrWhiteSpace(filename)) filename = "image_from_url.jpg";
-
-                Console.WriteLine($"Sending image to CNN for prediction...");
-                CNNResponse cnnPrediction = await _cnnPredictionService.PredictAircraftAsync(imageBytesBs, filename);
-
-                if (cnnPrediction == null || !cnnPrediction.Success)
-                {
-                    string cnnErrorDetail = cnnPrediction?.Detail ?? "CNN prediction service returned null or indicated failure.";
-                    Console.WriteLine($"Error: CNN prediction failed. Details: {cnnErrorDetail}");
-
-                    return StatusCode(500, $"CNN prediction failed: {cnnErrorDetail}");
-
-                }
-                Console.WriteLine($"CNN Prediction received: {cnnPrediction.PredictedAircraft} ({cnnPrediction.Probability:P1})");
-
-
-                string modelString = EnumHelper.GetEnumMemberValue(request.Model);
-                double temperature = request.Temperature ?? 1.0;
-                string basePrompt = DefaultCnnAltTextPrompt;
-
-                if (!string.IsNullOrWhiteSpace(request.Prompt) && !request.Prompt.Equals("string", StringComparison.OrdinalIgnoreCase))
-                {
-                    basePrompt += ". " + request.Prompt;
-                }
-
-                Console.WriteLine($"Calling LLM service with image bytes and CNN context...");
-                string llmResponse = await _imageRecognitionService.AnalyzeImage(
-                    modelString,
-                    imageBytesBs,
-                    basePrompt,
-                    cnnPrediction.PredictedAircraft,
-                    cnnPrediction.Probability,
-                    temperature);
-
-                if (llmResponse.StartsWith("Error:") || llmResponse.StartsWith("Model returned"))
-                {
-                    Console.WriteLine($"Error: LLM Analysis failed: {llmResponse}");
-                    return StatusCode(500, $"LLM analysis failed: {llmResponse}");
-                }
-
-                if (!string.IsNullOrWhiteSpace(llmResponse))
-                {
-                    llmResponse = llmResponse.Replace("\\\"", "\"");
-                }
-
-                Console.WriteLine($"Successfully received LLM response.");
-                return Ok(new { Response = llmResponse });
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[ERROR] Fatal error during CNN-LLM workflow for URL {request.ImageUrl}: {ex.Message}");
-                return StatusCode(500, "An unexpected internal server error occurred during the CNN-LLM workflow.");
-            }
+            await request.Image.CopyToAsync(ms);
+            imageBytesBs = ByteString.CopyFrom(ms.ToArray());
         }
+
+        if (imageBytesBs == null || imageBytesBs.Length == 0)
+        {
+            Console.WriteLine("Error: Received empty image data.");
+            return BadRequest("Image data is empty or could not be processed.");
+        }
+
+        string filename = request.Image.FileName ?? "uploaded_image.jpg";
+        Console.WriteLine($"Received image file: {filename}");
+
+        // CNN prediction
+        Console.WriteLine("Sending image to CNN for prediction...");
+        CNNResponse cnnPrediction = await _cnnPredictionService.PredictAircraftAsync(imageBytesBs, filename);
+
+        if (cnnPrediction == null || !cnnPrediction.Success)
+        {
+            string cnnErrorDetail = cnnPrediction?.Detail ?? "CNN prediction failed with no additional details.";
+            Console.WriteLine($"Error: CNN prediction failed. Details: {cnnErrorDetail}");
+            return StatusCode(500, $"CNN prediction failed: {cnnErrorDetail}");
+        }
+
+        Console.WriteLine($"CNN Prediction received: {cnnPrediction.PredictedAircraft} ({cnnPrediction.Probability:P1})");
+
+        // LLM prompt composition
+        string modelString = EnumHelper.GetEnumMemberValue(request.Model);
+        double temperature = request.Temperature ?? 1.0;
+        string basePrompt = DefaultCnnAltTextPrompt;
+
+        if (!string.IsNullOrWhiteSpace(request.Prompt) && request.Prompt.ToLowerInvariant() != "string")
+        {
+            basePrompt += ". " + request.Prompt;
+        }
+
+        Console.WriteLine("Calling LLM service...");
+        string llmResponse = await _imageRecognitionService.AnalyzeImage(
+            modelString,
+            imageBytesBs,
+            basePrompt,
+            cnnPrediction.PredictedAircraft,
+            cnnPrediction.Probability,
+            temperature);
+
+        if (llmResponse.StartsWith("Error:") || llmResponse.StartsWith("Model returned"))
+        {
+            Console.WriteLine($"Error: LLM Analysis failed: {llmResponse}");
+            return StatusCode(500, $"LLM analysis failed: {llmResponse}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(llmResponse))
+        {
+            llmResponse = llmResponse.Replace("\\\"", "\"");
+        }
+
+        Console.WriteLine("Alt text generated successfully.");
+        return Ok(new
+        {
+            Response = llmResponse,
+            Aircraft = cnnPrediction.PredictedAircraft,
+            Confidence = cnnPrediction.Probability
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[ERROR] Fatal error in CNN-LLM workflow: {ex}");
+        return StatusCode(500, "An internal server error occurred during image processing.");
+    }
+}
     }
 }
