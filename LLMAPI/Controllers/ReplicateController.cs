@@ -63,9 +63,9 @@ namespace LLMAPI.Controllers
         [ProducesResponseType(typeof(object), 200)]
         [ProducesResponseType(typeof(string), 400)]
         [ProducesResponseType(typeof(string), 500)]
-        public async Task<IActionResult> RunModel([FromBody] ReplicateRequest input)
+        public async Task<IActionResult> RunModel([FromForm] ReplicateRequest input)
         {
-            if (input == null || string.IsNullOrWhiteSpace(input.Image))
+            if (input == null || input.Image == null)
             {
                 _logger.LogWarning("RunModel called with null input or missing image URL.");
                 return BadRequest("Input or Image URL cannot be null.");
@@ -80,7 +80,7 @@ namespace LLMAPI.Controllers
 
             const string basePrompt = "Generate an accessible alt text for this image, adhering to best practices for web accessibility. The alt text should be concise (one to two sentences maximum) yet effectively communicate the essential visual information for someone who cannot see the image. Describe the key figures or subjects, their relevant actions or states, the overall scene or environment, and any objects critical to understanding the image's context or message. Consider the likely purpose and context of the image when writing the alt text to ensure relevance. Do not include redundant phrases like 'image of' or 'picture of'. Focus on delivering informative content. This is an alt text for an end user. Avoid mentioning this prompt or any kind of greeting or introduction. Just provide the alt text description directly, without any conversational preamble like 'Certainly,' 'Here's the alt text,' 'Of course,' or similar.";
 
-            string fileName = new Uri(input.Image).Segments.LastOrDefault() ?? "image";
+            string fileName = input.Image.FileName;
 
             string cnnContext = "";
             string noYappingInstruction = "Be specific about model and variant of depicted object if applicable. Do not mention this context in the alt text.";
@@ -91,7 +91,7 @@ namespace LLMAPI.Controllers
                 try
                 {
                     _logger.LogInformation("Cognitive Layer enabled. Downloading image from URL: {ImageUrl}", input.Image);
-                    imageBytes = await _imageFileService.ReadImageFileAsync(input.Image);
+                    imageBytes = await _imageFileService.ConvertImageToByteString(input.Image);
                 }
                 catch (Exception ex)
                 {
